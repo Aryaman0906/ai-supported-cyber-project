@@ -516,3 +516,232 @@ Check `/health`. If `text_model_loaded` is `false`, train the model first and re
 ### What to do next
 
 Continue to **Phase 4: URL phishing detection**. Phase 4 will add URL feature extraction, train a URL classifier, and expose `POST /analyze-url`.
+
+---
+
+## Phase 4: URL phishing detection
+
+### Goal
+
+Phase 4 adds URL phishing detection using explainable URL structure features. Like the text model, URL training is an offline step and real-time prediction happens through FastAPI.
+
+This phase adds:
+
+- A sanitized URL dataset.
+- URL feature extraction.
+- An offline Random Forest training script.
+- A saved URL model at `models/url_phishing_model.joblib`.
+- A real-time `POST /analyze-url` endpoint.
+
+### Files added or updated in Phase 4
+
+- `data/url_dataset.csv` contains safe sample URLs with `url,label` columns.
+- `api/features.py` extracts URL features used by training and prediction.
+- `train/train_url_model.py` trains and evaluates the URL classifier offline.
+- `api/url_analyzer.py` loads the saved URL model and analyzes URLs in real time.
+- `api/main.py` now loads both text and URL models at startup and exposes `POST /analyze-url`.
+
+### URL features extracted
+
+The URL analyzer extracts these features:
+
+- `url_length`: total length of the URL.
+- `uses_https`: whether the URL uses HTTPS.
+- `has_ip_address`: whether the hostname is an IP address.
+- `dot_count`: number of dots in the URL.
+- `hyphen_count`: number of hyphens in the URL.
+- `has_at_symbol`: whether the URL contains `@`.
+- `suspicious_keyword_count`: count of common suspicious URL words such as `login`, `verify`, `password`, `urgent`, and `claim`.
+- `subdomain_depth`: number of subdomain levels.
+- `domain_length`: length of the registered domain string.
+- `special_char_count`: number of non-alphanumeric characters.
+
+These features are simple and explainable for learning. They are not enough for production-grade URL security by themselves.
+
+### Dataset format
+
+The URL CSV file must use this format:
+
+```csv
+url,label
+https://www.university.edu/events/cybersecurity-workshop,legitimate
+http://verify-account.example-risk.test/confirm,phishing
+```
+
+Allowed labels are:
+
+- `legitimate`
+- `phishing`
+
+The sample suspicious URLs use documentation/test-style domains such as `example-risk.test` and reserved IP ranges where possible. Do not visit suspicious URLs during demos.
+
+### How the URL training script works
+
+`train/train_url_model.py` performs these steps:
+
+1. Loads `data/url_dataset.csv`.
+2. Checks that the required `url` and `label` columns exist.
+3. Cleans blank rows and normalizes labels.
+4. Extracts numeric URL features with `api/features.py`.
+5. Splits the data into training and test sets.
+6. Trains a `RandomForestClassifier` pipeline.
+7. Prints accuracy, precision, recall, F1-score, a classification report, and a confusion matrix.
+8. Saves the trained pipeline to `models/url_phishing_model.joblib`.
+
+### How to run Phase 4
+
+First install dependencies if needed:
+
+```bash
+pip install -r requirements.txt
+```
+
+Train the URL model:
+
+```bash
+python train/train_url_model.py
+```
+
+Start the API:
+
+```bash
+uvicorn api.main:app --reload
+```
+
+Open Swagger UI:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### API behavior
+
+#### `GET /health`
+
+The health endpoint now reports both model states:
+
+```json
+{
+  "status": "ok",
+  "text_model_loaded": true,
+  "url_model_loaded": true,
+  "details": {
+    "text_model": null,
+    "url_model": null
+  }
+}
+```
+
+#### `POST /analyze-url`
+
+Request body:
+
+```json
+{
+  "url": "http://verify-account.example-risk.test/confirm"
+}
+```
+
+Response body:
+
+```json
+{
+  "verdict": "phishing",
+  "score": 0.91,
+  "risk_level": "high",
+  "extracted_features": {
+    "url_length": 47,
+    "uses_https": 0,
+    "has_ip_address": 0,
+    "dot_count": 2,
+    "hyphen_count": 2,
+    "has_at_symbol": 0,
+    "suspicious_keyword_count": 3,
+    "subdomain_depth": 0,
+    "domain_length": 17,
+    "special_char_count": 8
+  },
+  "reasons": [
+    "The offline-trained URL model predicted 'phishing' with score 0.91.",
+    "The URL does not use HTTPS.",
+    "The URL contains suspicious keywords often seen in credential or urgency lures."
+  ],
+  "safety_note": "Defensive URL analysis only. Do not visit suspicious URLs. Use this as a learning-project signal and verify manually."
+}
+```
+
+The exact score can vary when the dataset changes and the model is retrained.
+
+### How to test Phase 4
+
+Check that the URL dataset exists:
+
+```bash
+test -f data/url_dataset.csv
+```
+
+Check that URL-related Python files have valid syntax:
+
+```bash
+python -m py_compile api/features.py api/url_analyzer.py train/train_url_model.py api/main.py
+```
+
+Train the URL model:
+
+```bash
+python train/train_url_model.py
+```
+
+Check that the saved URL model exists:
+
+```bash
+test -f models/url_phishing_model.joblib
+```
+
+Start the API and test with curl:
+
+```bash
+curl -X POST http://127.0.0.1:8000/analyze-url \
+  -H "Content-Type: application/json" \
+  -d '{"url":"http://verify-account.example-risk.test/confirm"}'
+```
+
+### Common errors and fixes
+
+#### `503 Service Unavailable` from `/analyze-url`
+
+The API started, but the URL model file is missing. Run:
+
+```bash
+python train/train_url_model.py
+```
+
+Then restart Uvicorn.
+
+#### `ModuleNotFoundError: No module named 'tldextract'`
+
+Install dependencies inside your active virtual environment:
+
+```bash
+pip install -r requirements.txt
+```
+
+#### URL without `http://` or `https://`
+
+The analyzer adds `http://` automatically when a scheme is missing. For clearer demos, include the full URL.
+
+#### Model performs poorly
+
+The starter dataset is tiny. Add more safe, permission-friendly labeled examples before drawing conclusions from the model.
+
+### Responsible-use and limitation notes for Phase 4
+
+- Do not visit suspicious URLs during testing.
+- Do not submit private reset links, tokens, session URLs, or URLs containing personal information.
+- The model uses simple structural features and may miss advanced phishing URLs.
+- Legitimate URLs can contain suspicious-looking patterns, so false positives are possible.
+- Treat the result as an assistive signal and combine it with human review.
+
+### What to do next
+
+Continue to **Phase 5: External threat intelligence checks**. Phase 5 will add optional PhishTank and VirusTotal support using environment variables for API keys while keeping the system usable without those keys.
