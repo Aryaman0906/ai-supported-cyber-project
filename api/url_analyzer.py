@@ -9,6 +9,7 @@ from typing import Any
 import joblib
 import pandas as pd
 
+from api.external_checks import run_external_url_checks
 from api.features import URL_FEATURE_COLUMNS, extract_url_features, normalize_url
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +25,7 @@ class UrlAnalysisResult:
     risk_level: str
     extracted_features: dict[str, Any]
     reasons: list[str]
+    external_checks: dict[str, Any]
     safety_note: str
 
 
@@ -49,7 +51,7 @@ class UrlPhishingAnalyzer:
 
         self.model = joblib.load(self.model_path)
 
-    def analyze(self, url: str) -> UrlAnalysisResult:
+    def analyze(self, url: str, include_external_checks: bool = False) -> UrlAnalysisResult:
         """Analyze a user-provided URL and return a defensive verdict."""
         if self.model is None:
             raise RuntimeError("URL phishing model is not loaded")
@@ -62,6 +64,7 @@ class UrlPhishingAnalyzer:
         score = self._get_prediction_score(feature_frame, verdict)
         risk_level = self._risk_level(verdict, score, features)
         reasons = self._build_reasons(verdict, score, features)
+        external_checks = run_external_url_checks(normalized_url, include_external_checks)
 
         return UrlAnalysisResult(
             verdict=verdict,
@@ -69,6 +72,7 @@ class UrlPhishingAnalyzer:
             risk_level=risk_level,
             extracted_features=features,
             reasons=reasons,
+            external_checks=external_checks,
             safety_note=(
                 "Defensive URL analysis only. Do not visit suspicious URLs. "
                 "Use this as a learning-project signal and verify manually."

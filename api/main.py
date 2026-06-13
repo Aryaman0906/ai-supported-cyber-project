@@ -94,6 +94,13 @@ class UrlAnalysisRequest(BaseModel):
         description="Sanitized URL to analyze. Do not submit private or sensitive links.",
         examples=["http://verify-account.example-risk.test/confirm"],
     )
+    include_external_checks: bool = Field(
+        default=False,
+        description=(
+            "Optional. When true, the API may send the URL to configured third-party "
+            "threat-intelligence providers such as VirusTotal or PhishTank."
+        ),
+    )
 
 
 class UrlAnalysisResponse(BaseModel):
@@ -104,6 +111,7 @@ class UrlAnalysisResponse(BaseModel):
     risk_level: str
     extracted_features: dict[str, Any]
     reasons: list[str]
+    external_checks: dict[str, Any]
     safety_note: str
 
 
@@ -161,7 +169,7 @@ def analyze_url(request: UrlAnalysisRequest) -> UrlAnalysisResponse:
         )
 
     try:
-        result = url_analyzer.analyze(request.url)
+        result = url_analyzer.analyze(request.url, request.include_external_checks)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
@@ -171,5 +179,6 @@ def analyze_url(request: UrlAnalysisRequest) -> UrlAnalysisResponse:
         risk_level=result.risk_level,
         extracted_features=result.extracted_features,
         reasons=result.reasons,
+        external_checks=result.external_checks,
         safety_note=result.safety_note,
     )

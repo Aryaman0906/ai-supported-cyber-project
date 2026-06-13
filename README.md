@@ -745,3 +745,211 @@ The starter dataset is tiny. Add more safe, permission-friendly labeled examples
 ### What to do next
 
 Continue to **Phase 5: External threat intelligence checks**. Phase 5 will add optional PhishTank and VirusTotal support using environment variables for API keys while keeping the system usable without those keys.
+
+---
+
+## Phase 5: Optional external threat intelligence checks
+
+### Goal
+
+Phase 5 adds optional supporting checks from external threat-intelligence providers. These checks are **not required** for the project to work. The local ML/rule-based URL analysis still works without any API keys.
+
+This phase adds optional checks for:
+
+- VirusTotal URL reports.
+- PhishTank URL lookups.
+
+Important privacy rule: external checks can disclose the submitted URL to a third party. For that reason, the API only runs these checks when the request sets `include_external_checks` to `true`.
+
+### Files added or updated in Phase 5
+
+- `api/external_checks.py` contains optional VirusTotal and PhishTank lookup helpers.
+- `api/url_analyzer.py` can include external-check results in URL analysis responses.
+- `api/main.py` adds `include_external_checks` to the `/analyze-url` request body and returns an `external_checks` object.
+- `.env.example` documents the optional environment variables without storing real keys.
+
+### Environment variables
+
+Do **not** hardcode API keys in Python files. Use environment variables instead.
+
+Create a local `.env` file from the example file:
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env`:
+
+```env
+VIRUSTOTAL_API_KEY=your_virustotal_key_here
+PHISHTANK_API_KEY=your_phishtank_key_here
+```
+
+The `.env` file is ignored by Git. Keep real keys private.
+
+If you do not provide keys, the API will return provider results with `status: "skipped"` instead of failing.
+
+### How the checks work
+
+#### VirusTotal
+
+`api/external_checks.py` uses the VirusTotal API v3 URL report endpoint. It creates the VirusTotal URL identifier by URL-safe base64 encoding the submitted URL without padding, then requests a URL report using the `VIRUSTOTAL_API_KEY` header.
+
+The response is summarized into:
+
+- `malicious`
+- `suspicious`
+- `harmless`
+- `undetected`
+- `risk_hint`
+
+#### PhishTank
+
+`api/external_checks.py` sends a POST request to the PhishTank check URL endpoint when `PHISHTANK_API_KEY` is configured.
+
+The response is summarized into:
+
+- `in_database`
+- `valid_phish`
+- `verified`
+- `risk_hint`
+
+### Updated `/analyze-url` request
+
+External checks are disabled by default:
+
+```json
+{
+  "url": "http://verify-account.example-risk.test/confirm"
+}
+```
+
+To opt in, set `include_external_checks` to `true`:
+
+```json
+{
+  "url": "http://verify-account.example-risk.test/confirm",
+  "include_external_checks": true
+}
+```
+
+### Example response without external checks
+
+```json
+{
+  "verdict": "phishing",
+  "score": 0.91,
+  "risk_level": "high",
+  "extracted_features": {},
+  "reasons": [],
+  "external_checks": {
+    "enabled": false,
+    "privacy_note": "External checks were not requested. Set include_external_checks=true only for URLs you have permission to share with third-party services.",
+    "providers": []
+  },
+  "safety_note": "Defensive URL analysis only. Do not visit suspicious URLs. Use this as a learning-project signal and verify manually."
+}
+```
+
+### Example response with external checks but no API keys
+
+```json
+{
+  "external_checks": {
+    "enabled": true,
+    "privacy_note": "The submitted URL may have been shared with configured third-party threat-intelligence providers. Do not submit private or sensitive URLs.",
+    "providers": [
+      {
+        "provider": "virustotal",
+        "status": "skipped",
+        "reason": "VIRUSTOTAL_API_KEY is not set"
+      },
+      {
+        "provider": "phishtank",
+        "status": "skipped",
+        "reason": "PHISHTANK_API_KEY is not set"
+      }
+    ]
+  }
+}
+```
+
+### How to run Phase 5
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Optional: create `.env` and add keys:
+
+```bash
+cp .env.example .env
+```
+
+The application loads `.env` automatically with `python-dotenv`. You can also export variables in your shell instead.
+
+Linux/macOS export example:
+
+```bash
+export VIRUSTOTAL_API_KEY="your_key_here"
+export PHISHTANK_API_KEY="your_key_here"
+```
+
+Windows PowerShell export example:
+
+```powershell
+$env:VIRUSTOTAL_API_KEY="your_key_here"
+$env:PHISHTANK_API_KEY="your_key_here"
+```
+
+Train the URL model if needed:
+
+```bash
+python train/train_url_model.py
+```
+
+Start the API:
+
+```bash
+uvicorn api.main:app --reload
+```
+
+Test with curl:
+
+```bash
+curl -X POST http://127.0.0.1:8000/analyze-url \
+  -H "Content-Type: application/json" \
+  -d '{"url":"http://verify-account.example-risk.test/confirm","include_external_checks":true}'
+```
+
+### Common errors and fixes
+
+#### Provider returns `status: "skipped"`
+
+The related API key is not set. This is expected when you have not configured optional external checks.
+
+#### Provider returns `status: "error"` with rate limit text
+
+You may have exceeded the provider's free-tier limit. Wait and try later, or disable external checks.
+
+#### Request is slow
+
+External services require network calls. The project uses short request timeouts, but external checks will still be slower than local ML prediction.
+
+#### You are unsure whether a URL is private
+
+Do not submit it to external checks. Keep `include_external_checks` as `false` and rely on local analysis plus human review.
+
+### API limits and privacy concerns
+
+- VirusTotal and PhishTank can have rate limits, quotas, authentication rules, and acceptable-use policies.
+- API behavior can change over time, so check the official provider documentation before a final demo.
+- Submitted URLs may be stored or shared by the provider.
+- Never submit URLs containing credentials, password reset tokens, session IDs, private hostnames, or personal information.
+- External results are supporting evidence only. They do not replace human review.
+
+### What to do next
+
+Continue to **Phase 6: Log triage module**. Phase 6 will add local sanitized log analysis and optional watchdog-based file monitoring.
