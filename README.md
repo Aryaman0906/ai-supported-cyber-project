@@ -1366,3 +1366,42 @@ Explain that the starter datasets are small and the project is focused on archit
 ### Final responsible-use reminder
 
 This project is for defensive learning only. Do not use it for phishing generation, credential theft, unauthorized monitoring, scanning, exploitation, or analysis of private data without permission.
+
+---
+
+## Final validation and real-time readiness check
+
+After Phase 8, run this dependency-light checker first:
+
+```bash
+python tests/phase_completion_check.py
+```
+
+This script verifies that:
+
+- All expected project files exist.
+- The text and URL datasets use the required CSV headers.
+- FastAPI endpoint strings are present in `api/main.py`.
+- The frontend references `/health`, `/analyze-text`, `/analyze-url`, and `/analyze-log-line`.
+- The report files contain the required responsible-use and project-explanation sections.
+- The local log analyzer can parse and score a suspicious sanitized log line.
+
+To fully verify real-time ML/API behavior, install dependencies, train both models, start FastAPI, and test the endpoints:
+
+```bash
+pip install -r requirements.txt
+python train/train_text_model.py
+python train/train_url_model.py
+uvicorn api.main:app --reload
+```
+
+Then test in another terminal:
+
+```bash
+curl http://127.0.0.1:8000/health
+curl -X POST http://127.0.0.1:8000/analyze-text -H "Content-Type: application/json" -d '{"text":"Urgent action required: confirm your login details."}'
+curl -X POST http://127.0.0.1:8000/analyze-url -H "Content-Type: application/json" -d '{"url":"http://verify-account.example-risk.test/confirm"}'
+curl -X POST http://127.0.0.1:8000/analyze-log-line -H "Content-Type: application/json" -d '{"log_line":"203.0.113.50 - - [13/Jun/2026:10:01:12 +0000] \"GET /.env HTTP/1.1\" 404 121 \"-\" \"Scanner-Test-Agent\""}'
+```
+
+If dependency installation is blocked by your environment or network, the dependency-light checker still confirms the repository structure and local log analyzer behavior. Full model training and FastAPI runtime tests require the packages in `requirements.txt`.
