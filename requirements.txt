@@ -18,3 +18,12 @@ watchdog==4.0.1
 
 # Optional development/testing helpers
 pytest==8.3.2
+
+# Google Cloud / Gmail bot integration
+google-api-python-client==2.143.0
+google-auth==2.34.0
+google-auth-oauthlib==1.2.1
+google-auth-httplib2==0.2.0
+google-cloud-firestore==2.19.0
+google-cloud-secret-manager==2.20.2
+cryptography==43.0.1

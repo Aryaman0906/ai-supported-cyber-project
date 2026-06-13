@@ -254,7 +254,7 @@ pip install -r requirements.txt
 Then run the training script from the repository root:
 
 ```bash
-python train/train_text_model.py
+python -m train.train_text_model
 ```
 
 Expected result:
@@ -279,7 +279,7 @@ python -m py_compile train/train_text_model.py
 Train the model:
 
 ```bash
-python train/train_text_model.py
+python -m train.train_text_model
 ```
 
 Check that the saved model file was created:
@@ -305,7 +305,7 @@ Also confirm that your virtual environment is activated.
 Run the script from the repository root:
 
 ```bash
-python train/train_text_model.py
+python -m train.train_text_model
 ```
 
 The script expects the dataset at `data/phishing_dataset.csv`.
@@ -376,7 +376,7 @@ Example response when the model has not been trained yet:
 {
   "status": "model_not_loaded",
   "text_model_loaded": false,
-  "detail": "Text model not found ... Run: python train/train_text_model.py"
+  "detail": "Text model not found ... Run: python -m train.train_text_model"
 }
 ```
 
@@ -413,7 +413,7 @@ First, install dependencies and train the Phase 2 model:
 
 ```bash
 pip install -r requirements.txt
-python train/train_text_model.py
+python -m train.train_text_model
 ```
 
 Then start the FastAPI server:
@@ -480,7 +480,7 @@ curl -X POST http://127.0.0.1:8000/analyze-text \
 The API started, but the model file is missing. Run:
 
 ```bash
-python train/train_text_model.py
+python -m train.train_text_model
 ```
 
 Then restart Uvicorn.
@@ -599,7 +599,7 @@ pip install -r requirements.txt
 Train the URL model:
 
 ```bash
-python train/train_url_model.py
+python -m train.train_url_model
 ```
 
 Start the API:
@@ -689,7 +689,7 @@ python -m py_compile api/features.py api/url_analyzer.py train/train_url_model.p
 Train the URL model:
 
 ```bash
-python train/train_url_model.py
+python -m train.train_url_model
 ```
 
 Check that the saved URL model exists:
@@ -713,7 +713,7 @@ curl -X POST http://127.0.0.1:8000/analyze-url \
 The API started, but the URL model file is missing. Run:
 
 ```bash
-python train/train_url_model.py
+python -m train.train_url_model
 ```
 
 Then restart Uvicorn.
@@ -907,7 +907,7 @@ $env:PHISHTANK_API_KEY="your_key_here"
 Train the URL model if needed:
 
 ```bash
-python train/train_url_model.py
+python -m train.train_url_model
 ```
 
 Start the API:
@@ -1177,8 +1177,8 @@ First install dependencies and train the models if you have not already done so:
 
 ```bash
 pip install -r requirements.txt
-python train/train_text_model.py
-python train/train_url_model.py
+python -m train.train_text_model
+python -m train.train_url_model
 ```
 
 Start FastAPI:
@@ -1258,8 +1258,8 @@ http://127.0.0.1:8000
 The related model file has not been trained yet. Run:
 
 ```bash
-python train/train_text_model.py
-python train/train_url_model.py
+python -m train.train_text_model
+python -m train.train_url_model
 ```
 
 Then restart FastAPI.
@@ -1303,8 +1303,8 @@ Use this checklist before presenting:
 
 1. Create and activate a virtual environment.
 2. Install dependencies with `pip install -r requirements.txt`.
-3. Train the text model with `python train/train_text_model.py`.
-4. Train the URL model with `python train/train_url_model.py`.
+3. Train the text model with `python -m train.train_text_model`.
+4. Train the URL model with `python -m train.train_url_model`.
 5. Start FastAPI with `uvicorn api.main:app --reload`.
 6. Open Swagger UI at `http://127.0.0.1:8000/docs`.
 7. Test `POST /analyze-text`.
@@ -1390,8 +1390,8 @@ To fully verify real-time ML/API behavior, install dependencies, train both mode
 
 ```bash
 pip install -r requirements.txt
-python train/train_text_model.py
-python train/train_url_model.py
+python -m train.train_text_model
+python -m train.train_url_model
 uvicorn api.main:app --reload
 ```
 

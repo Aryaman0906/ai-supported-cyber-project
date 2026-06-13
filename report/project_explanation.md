@@ -208,8 +208,8 @@ pip install -r requirements.txt
 ### 3. Train models
 
 ```bash
-python train/train_text_model.py
-python train/train_url_model.py
+python -m train.train_text_model
+python -m train.train_url_model
 ```
 
 ### 4. Start FastAPI
