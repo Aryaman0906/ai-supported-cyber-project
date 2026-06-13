@@ -83,6 +83,23 @@
       color: #1e40af;
     }
 
+    .primary-mode {
+      border: 2px solid #86efac;
+      background: #f0fdf4;
+    }
+
+    .optional-mode {
+      border-style: dashed;
+      background: #fffbeb;
+    }
+
+    .optional-mode summary {
+      cursor: pointer;
+      color: #92400e;
+      font-size: 1.2rem;
+      margin-bottom: 0.75rem;
+    }
+
     label {
       display: block;
       font-weight: 700;
@@ -249,9 +266,9 @@
       </article>
 
 
-      <article class="card">
-        <h2>Gmail Polling Bot</h2>
-        <p class="hint">No-billing local mode. Uses local credentials.json/token.json on the backend only; secrets are never shown here.</p>
+      <article class="card primary-mode">
+        <h2>Local Gmail Polling Bot - Active <span class="badge low">Primary</span></h2>
+        <p class="hint"><strong>This is the no-billing local mode using Gmail API polling and Windows Task Scheduler.</strong> Uses local credentials.json/token.json on the backend only; secrets are never shown here.</p>
         <div class="controls">
           <button type="button" onclick="pollingStatus()">Refresh status</button>
           <button type="button" onclick="pollingScanNow()">Run scan now</button>
@@ -261,11 +278,12 @@
         </div>
         <div id="pollingResult" class="result" aria-live="polite"></div>
       </article>
-      <article class="card">
-        <h2>Gmail Security Bot</h2>
+      <details class="card optional-mode">
+        <summary><strong>Optional Cloud Gmail Bot - Not configured</strong></summary>
+        <p class="hint"><strong>Warning:</strong> This requires Cloud Run, Pub/Sub, Firestore, Secret Manager, and Cloud Scheduler. Ignore this section for the local no-billing setup.</p>
         <label for="gmailEmail">Authorized Gmail address</label>
         <input id="gmailEmail" type="text" value="user@example.com" />
-        <p class="hint">Do not put secrets in this page. Complete OAuth and Cloud setup on the backend.</p>
+        <p class="hint">Do not put secrets in this page. Cloud mode will return setup/configuration errors until the backend and Google Cloud resources are configured.</p>
         <div class="controls">
           <button type="button" onclick="startGmailOAuth()">Start Gmail OAuth</button>
           <button type="button" onclick="gmailStatus()">Gmail bot status</button>
@@ -274,7 +292,7 @@
           <button type="button" onclick="generateTodayReport()">Generate today's report</button>
         </div>
         <div id="gmailResult" class="result" aria-live="polite"></div>
-      </article>
+      </details>
     </section>
   </main>
 
