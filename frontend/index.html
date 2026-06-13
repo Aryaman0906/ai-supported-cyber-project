@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI-Assisted Cyber Defender</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --border: #dbe3ef;
+      --low: #15803d;
+      --medium: #b45309;
+      --high: #b91c1c;
+      --code: #0f172a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e3a8a, #2563eb);
+      color: white;
+      padding: 2rem 1rem;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.8rem, 4vw, 3rem);
+    }
+
+    header p {
+      max-width: 900px;
+      margin: 0.5rem auto 0;
+      color: #dbeafe;
+    }
+
+    main {
+      width: min(1180px, calc(100% - 2rem));
+      margin: 2rem auto;
+    }
+
+    .notice {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-left: 5px solid #f97316;
+      padding: 1rem;
+      border-radius: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1rem;
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+    }
+
+    .card h2 {
+      margin-top: 0;
+      color: #1e40af;
+    }
+
+    .primary-mode {
+      border: 2px solid #86efac;
+      background: #f0fdf4;
+    }
+
+    .optional-mode {
+      border-style: dashed;
+      background: #fffbeb;
+    }
+
+    .optional-mode summary {
+      cursor: pointer;
+      color: #92400e;
+      font-size: 1.2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+
+    textarea,
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 0.65rem;
+      padding: 0.8rem;
+      font: inherit;
+      min-height: 2.75rem;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 150px;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 0.8rem;
+    }
+
+    button {
+      border: 0;
+      border-radius: 0.65rem;
+      background: var(--primary);
+      color: white;
+      padding: 0.75rem 1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: var(--primary-dark);
+    }
+
+    button:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .result {
+      margin-top: 1rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+    }
+
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 0.25rem 0.65rem;
+      font-weight: 700;
+      color: white;
+      background: var(--muted);
+    }
+
+    .badge.low {
+      background: var(--low);
+    }
+
+    .badge.medium,
+    .badge.low-confidence {
+      background: var(--medium);
+    }
+
+    .badge.high {
+      background: var(--high);
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: var(--code);
+      color: #e5e7eb;
+      padding: 0.9rem;
+      border-radius: 0.75rem;
+      overflow-x: auto;
+    }
+
+    ul {
+      padding-left: 1.3rem;
+    }
+
+    footer {
+      color: var(--muted);
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AI-Assisted Cyber Defender</h1>
+    <p>Defensive-only real-time phishing, URL, and sanitized log triage demo powered by local FastAPI endpoints.</p>
+  </header>
+
+  <main>
+    <section class="notice">
+      <strong>Responsible-use reminder:</strong>
+      Use sanitized examples, test URLs, toy logs, or user-provided content only. Do not paste credentials,
+      private reset links, personal inbox data, production secrets, or logs you do not have permission to analyze.
+    </section>
+
+    <section class="card" aria-labelledby="api-settings-heading">
+      <h2 id="api-settings-heading">API settings</h2>
+      <label for="apiBaseUrl">FastAPI base URL</label>
+      <input id="apiBaseUrl" type="text" value="http://127.0.0.1:8000" />
+      <p class="hint">Start the backend with <code>uvicorn api.main:app --reload</code>, then use this page.</p>
+      <button type="button" onclick="checkHealth()">Check API health</button>
+      <div id="healthResult" class="result" aria-live="polite"></div>
+    </section>
+
+    <section class="grid" aria-label="Analysis tools">
+      <article class="card">
+        <h2>Email/Text analysis</h2>
+        <label for="textInput">Paste sanitized email or text</label>
+        <textarea id="textInput">Urgent action required: confirm your login details to avoid suspension.</textarea>
+        <div class="controls">
+          <button type="button" onclick="analyzeText()">Analyze text</button>
+          <span class="hint">Endpoint: <code>POST /analyze-text</code></span>
+        </div>
+        <div id="textResult" class="result" aria-live="polite"></div>
+      </article>
+
+      <article class="card">
+        <h2>URL analysis</h2>
+        <label for="urlInput">Paste a test URL</label>
+        <input id="urlInput" type="text" value="http://verify-account.example-risk.test/confirm" />
+        <div class="controls">
+          <label>
+            <input id="externalChecks" type="checkbox" />
+            Include optional external checks
+          </label>
+        </div>
+        <p class="hint">External checks may send the URL to third-party providers. Use only safe test URLs.</p>
+        <div class="controls">
+          <button type="button" onclick="analyzeUrl()">Analyze URL</button>
+          <span class="hint">Endpoint: <code>POST /analyze-url</code></span>
+        </div>
+        <div id="urlResult" class="result" aria-live="polite"></div>
+      </article>
+
+      <article class="card">
+        <h2>Log line triage</h2>
+        <label for="logInput">Paste one sanitized Apache/Nginx-style log line</label>
+        <textarea id="logInput">203.0.113.50 - - [13/Jun/2026:10:01:12 +0000] "GET /.env HTTP/1.1" 404 121 "-" "Scanner-Test-Agent"</textarea>
+        <div class="controls">
+          <button type="button" onclick="analyzeLogLine()">Analyze log line</button>
+          <span class="hint">Endpoint: <code>POST /analyze-log-line</code></span>
+        </div>
+        <div id="logResult" class="result" aria-live="polite"></div>
+      </article>
+
+
+      <article class="card primary-mode">
+        <h2>Local Gmail Polling Bot - Active <span class="badge low">Primary</span></h2>
+        <p class="hint"><strong>This is the no-billing local mode using Gmail API polling and Windows Task Scheduler.</strong> Uses local credentials.json/token.json on the backend only; secrets are never shown here.</p>
+        <div class="controls">
+          <button type="button" onclick="pollingStatus()">Refresh status</button>
+          <button type="button" onclick="pollingScanNow()">Run scan now</button>
+          <button type="button" onclick="pollingReportToday()">Generate today's report</button>
+          <button type="button" onclick="pollingLatestLog()">Load latest log</button>
+          <button type="button" onclick="pollingReports()">List reports</button>
+        </div>
+        <div id="pollingResult" class="result" aria-live="polite"></div>
+      </article>
+      <details class="card optional-mode">
+        <summary><strong>Optional Cloud Gmail Bot - Not configured</strong></summary>
+        <p class="hint"><strong>Warning:</strong> This requires Cloud Run, Pub/Sub, Firestore, Secret Manager, and Cloud Scheduler. Ignore this section for the local no-billing setup.</p>
+        <label for="gmailEmail">Authorized Gmail address</label>
+        <input id="gmailEmail" type="text" value="user@example.com" />
+        <p class="hint">Do not put secrets in this page. Cloud mode will return setup/configuration errors until the backend and Google Cloud resources are configured.</p>
+        <div class="controls">
+          <button type="button" onclick="startGmailOAuth()">Start Gmail OAuth</button>
+          <button type="button" onclick="gmailStatus()">Gmail bot status</button>
+          <button type="button" onclick="startGmailWatch()">Start/Renew Gmail watch</button>
+          <button type="button" onclick="manualGmailScan()">Manual scan latest 10</button>
+          <button type="button" onclick="generateTodayReport()">Generate today's report</button>
+        </div>
+        <div id="gmailResult" class="result" aria-live="polite"></div>
+      </details>
+    </section>
+  </main>
+
+  <footer>
+    College mini-project demo. Defensive learning only. Human review required for real security decisions.
+  </footer>
+
+  <script>
+    function getApiBaseUrl() {
+      return document.getElementById("apiBaseUrl").value.replace(/\/$/, "");
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function riskBadge(riskLevel) {
+      const safeRisk = escapeHtml(riskLevel || "unknown");
+      return `<span class="badge ${safeRisk}">${safeRisk}</span>`;
+    }
+
+    function renderResult(containerId, data, primaryLabel) {
+      const container = document.getElementById(containerId);
+      const riskLevel = data.risk_level || "unknown";
+      const score = data.confidence ?? data.score ?? data.risk_score ?? "n/a";
+      const reasons = Array.isArray(data.reasons) ? data.reasons : [];
+      const reasonItems = reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("");
+
+      container.innerHTML = `
+        <p><strong>${escapeHtml(primaryLabel)}:</strong> ${escapeHtml(data.prediction || data.verdict || data.status || "unknown")}</p>
+        <p><strong>Score/confidence:</strong> ${escapeHtml(score)}</p>
+        <p><strong>Risk:</strong> ${riskBadge(riskLevel)}</p>
+        <p><strong>Reasons:</strong></p>
+        <ul>${reasonItems || "<li>No reasons returned.</li>"}</ul>
+        <details>
+          <summary>Raw JSON response</summary>
+          <pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>
+        </details>
+      `;
+    }
+
+    function renderError(containerId, error) {
+      document.getElementById(containerId).innerHTML = `
+        <p><span class="badge high">error</span></p>
+        <p>${escapeHtml(error.message || error)}</p>
+      `;
+    }
+
+    async function postJson(path, payload) {
+      const response = await fetch(`${getApiBaseUrl()}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || `Request failed with status ${response.status}`);
+      }
+      return data;
+    }
+
+    async function checkHealth() {
+      const containerId = "healthResult";
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/health`);
+        const data = await response.json();
+        renderResult(containerId, data, "API status");
+      } catch (error) {
+        renderError(containerId, error);
+      }
+    }
+
+    async function analyzeText() {
+      const containerId = "textResult";
+      try {
+        const text = document.getElementById("textInput").value;
+        const data = await postJson("/analyze-text", { text });
+        renderResult(containerId, data, "Prediction");
+      } catch (error) {
+        renderError(containerId, error);
+      }
+    }
+
+    async function analyzeUrl() {
+      const containerId = "urlResult";
+      try {
+        const url = document.getElementById("urlInput").value;
+        const includeExternalChecks = document.getElementById("externalChecks").checked;
+        const data = await postJson("/analyze-url", {
+          url,
+          include_external_checks: includeExternalChecks,
+        });
+        renderResult(containerId, data, "Verdict");
+      } catch (error) {
+        renderError(containerId, error);
+      }
+    }
+
+    async function analyzeLogLine() {
+      const containerId = "logResult";
+      try {
+        const logLine = document.getElementById("logInput").value;
+        const data = await postJson("/analyze-log-line", { log_line: logLine });
+        renderResult(containerId, data, "Verdict");
+      } catch (error) {
+        renderError(containerId, error);
+      }
+    }
+
+
+    function gmailEmail() {
+      return document.getElementById("gmailEmail").value;
+    }
+
+    function startGmailOAuth() {
+      window.location.href = `${getApiBaseUrl()}/gmail/auth/start`;
+    }
+
+    async function gmailStatus() {
+      const containerId = "gmailResult";
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/gmail/status?email=${encodeURIComponent(gmailEmail())}`);
+        const data = await response.json();
+        renderResult(containerId, data, "Gmail status");
+      } catch (error) {
+        renderError(containerId, error);
+      }
+    }
+
+    async function startGmailWatch() {
+      const containerId = "gmailResult";
+      try {
+        const data = await postJson("/gmail/watch/start", { email: gmailEmail() });
+        renderResult(containerId, data, "Watch");
+      } catch (error) {
+        renderError(containerId, error);
+      }
+    }
+
+    async function manualGmailScan() {
+      const containerId = "gmailResult";
+      try {
+        const data = await postJson("/gmail/scan-now", { email: gmailEmail(), max_results: 10, force: false });
+        renderResult(containerId, data, "Scan");
+      } catch (error) {
+        renderError(containerId, error);
+      }
+    }
+
+    async function generateTodayReport() {
+      const containerId = "gmailResult";
+      try {
+        const data = await postJson("/reports/generate-daily", { email: gmailEmail(), upload_to_drive: false });
+        renderResult(containerId, data, "Report");
+      } catch (error) {
+        renderError(containerId, error);
+      }
+    }
+
+
+    function renderPollingSummary(data) {
+      const container = document.getElementById("pollingResult");
+      const counts = data.high_count !== undefined
+        ? `<p><strong>Counts:</strong> high=${escapeHtml(data.high_count)} medium=${escapeHtml(data.medium_count)} low=${escapeHtml(data.low_count)} unknown=${escapeHtml(data.unknown_count)}</p>`
+        : "";
+      const latestReport = data.latest_report_date
+        ? `<p><strong>Latest report:</strong> ${escapeHtml(data.latest_report_date)}</p>`
+        : "";
+      container.innerHTML = `
+        <p><strong>Status:</strong> ${escapeHtml(data.status || data.bot_mode || "ok")}</p>
+        ${counts}
+        ${latestReport}
+        <details open>
+          <summary>Polling dashboard JSON</summary>
+          <pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>
+        </details>
+      `;
+    }
+
+    async function pollingStatus() {
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/polling/status`);
+        renderPollingSummary(await response.json());
+      } catch (error) {
+        renderError("pollingResult", error);
+      }
+    }
+
+    async function pollingScanNow() {
+      try {
+        const data = await postJson("/polling/scan-now", { limit: 20, dry_run: false });
+        renderPollingSummary(data);
+      } catch (error) {
+        renderError("pollingResult", error);
+      }
+    }
+
+    async function pollingReportToday() {
+      try {
+        const data = await postJson("/polling/report-today", {});
+        renderPollingSummary({ status: "report_generated", ...data });
+      } catch (error) {
+        renderError("pollingResult", error);
+      }
+    }
+
+    async function pollingLatestLog() {
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/polling/latest-log`);
+        const data = await response.json();
+        document.getElementById("pollingResult").innerHTML = `
+          <p><strong>Latest task log:</strong> ${escapeHtml(data.path || "not found")}</p>
+          <pre>${escapeHtml((data.lines || []).join("\n"))}</pre>
+          <details><summary>Raw JSON</summary><pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre></details>
+        `;
+      } catch (error) {
+        renderError("pollingResult", error);
+      }
+    }
+
+    async function pollingReports() {
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/polling/reports`);
+        renderPollingSummary(await response.json());
+      } catch (error) {
+        renderError("pollingResult", error);
+      }
+    }
+
+  </script>
+</body>
+</html>
