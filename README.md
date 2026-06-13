@@ -1140,3 +1140,146 @@ The rules are intentionally simple and sensitive for learning. Tune thresholds i
 ### What to do next
 
 Continue to **Phase 7: Simple frontend**. Phase 7 will add a browser page that can call the text, URL, and log analysis endpoints.
+
+---
+
+## Phase 7: Simple frontend
+
+### Goal
+
+Phase 7 adds a beginner-friendly browser page for the real-time API. The frontend lets a user paste:
+
+1. Email/text content.
+2. A URL.
+3. One sanitized log line.
+
+The page calls the FastAPI endpoints with `fetch()` and displays the verdict, score/confidence, risk level, reasons, and raw JSON response.
+
+### File added in Phase 7
+
+- `frontend/index.html` is a single-file HTML/CSS/JavaScript demo page.
+
+### What the frontend can do
+
+The page includes:
+
+- A FastAPI base URL setting, defaulting to `http://127.0.0.1:8000`.
+- A **Check API health** button that calls `GET /health`.
+- An **Email/Text analysis** card that calls `POST /analyze-text`.
+- A **URL analysis** card that calls `POST /analyze-url`.
+- An optional checkbox for `include_external_checks`.
+- A **Log line triage** card that calls `POST /analyze-log-line`.
+- Result cards with risk badges, reasons, and expandable raw JSON.
+
+### How to run Phase 7
+
+First install dependencies and train the models if you have not already done so:
+
+```bash
+pip install -r requirements.txt
+python train/train_text_model.py
+python train/train_url_model.py
+```
+
+Start FastAPI:
+
+```bash
+uvicorn api.main:app --reload
+```
+
+Then open the frontend file in your browser:
+
+```text
+frontend/index.html
+```
+
+You can usually open it by double-clicking the file, or by right-clicking and choosing **Open With → Browser**.
+
+Optional: serve the frontend with Python's built-in static file server:
+
+```bash
+python -m http.server 8080 --directory frontend
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8080
+```
+
+### How to test Phase 7
+
+Check that the frontend file exists:
+
+```bash
+test -f frontend/index.html
+```
+
+Check that the frontend references the expected API endpoints:
+
+```bash
+python - <<'PY'
+from pathlib import Path
+html = Path('frontend/index.html').read_text()
+required = ['/health', '/analyze-text', '/analyze-url', '/analyze-log-line']
+missing = [item for item in required if item not in html]
+if missing:
+    raise SystemExit(f'Missing expected endpoint strings: {missing}')
+print('frontend endpoint references OK')
+PY
+```
+
+Manual browser test:
+
+1. Start FastAPI with `uvicorn api.main:app --reload`.
+2. Open `frontend/index.html` in a browser.
+3. Click **Check API health**.
+4. Test the sample text, URL, and log line already filled into the page.
+5. Confirm each result shows a verdict, score/confidence, risk badge, reasons, and raw JSON.
+
+### Common errors and fixes
+
+#### Browser shows `Failed to fetch`
+
+FastAPI is probably not running, or the base URL is wrong. Start the backend:
+
+```bash
+uvicorn api.main:app --reload
+```
+
+Then confirm the page's API base URL is:
+
+```text
+http://127.0.0.1:8000
+```
+
+#### `/analyze-text` or `/analyze-url` returns `503 Service Unavailable`
+
+The related model file has not been trained yet. Run:
+
+```bash
+python train/train_text_model.py
+python train/train_url_model.py
+```
+
+Then restart FastAPI.
+
+#### URL external checks return `skipped`
+
+This is normal if API keys are not configured. External checks are optional.
+
+#### Log analysis says the format is invalid
+
+Use the sample log format from `data/sample_logs.log`. The parser expects quotes around the request, referrer, and User-Agent fields.
+
+### Responsible-use and limitation notes for Phase 7
+
+- Do not paste real credentials, private URLs, private emails, or sensitive logs into the demo.
+- The frontend is a local educational demo, not a hardened production application.
+- External checks can disclose URLs to third-party providers when enabled.
+- Model and rule outputs are assistive signals only and need human review.
+- CORS is permissive for local learning; restrict it before any real deployment.
+
+### What to do next
+
+Continue to **Phase 8: Report and documentation**. Phase 8 will add the responsible-use write-up and a college-submission-style project explanation.
