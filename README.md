@@ -953,3 +953,190 @@ Do not submit it to external checks. Keep `include_external_checks` as `false` a
 ### What to do next
 
 Continue to **Phase 6: Log triage module**. Phase 6 will add local sanitized log analysis and optional watchdog-based file monitoring.
+
+---
+
+## Phase 6: Log triage module and real-time monitoring
+
+### Goal
+
+Phase 6 adds defensive log triage for sanitized Apache/Nginx-style access logs. This gives the project its second real-time capability:
+
+1. `POST /analyze-log-line` for instant API triage of one pasted log line.
+2. `monitor_logs.py` for watchdog-based real-time monitoring of a local sample log file.
+
+This module is local and defensive only. It does not attack, scan, exploit, or connect to any target system.
+
+### Files added or updated in Phase 6
+
+- `data/sample_logs.log` contains sanitized Apache/Nginx-style sample logs.
+- `api/log_analyzer.py` parses log lines and detects suspicious local patterns.
+- `api/main.py` exposes `POST /analyze-log-line`.
+- `monitor_logs.py` watches a local sample log file with watchdog and prints alerts for suspicious new lines.
+
+### Suspicious patterns detected
+
+The Phase 6 rule-based analyzer checks for:
+
+- Requests to sensitive or commonly probed paths such as `/admin`, `/wp-login`, `/.env`, `/backup`, `/config`, `/phpmyadmin`, and `/server-status`.
+- Repeated `404` responses from the same IP during the current analyzer session.
+- `401` or `403` authentication/authorization failure statuses.
+- Requests for scanning-related file extensions such as `.zip`, `.bak`, `.sql`, `.env`, and `.old`.
+- Many recent requests to many different paths from one IP.
+- User-Agent values containing scanner/bot-like wording.
+
+The analyzer returns:
+
+- `verdict`: `normal`, `suspicious`, or `anomalous`.
+- `risk_score`: integer from `0` to `100`.
+- `risk_level`: `low`, `medium`, or `high`.
+- `reasons`: human-readable explanation list.
+- `parsed`: extracted log fields.
+- `safety_note`: defensive-use reminder.
+
+### Sample log format
+
+The parser expects Apache/Nginx-style access log lines like:
+
+```text
+203.0.113.50 - - [13/Jun/2026:10:01:12 +0000] "GET /.env HTTP/1.1" 404 121 "-" "Scanner-Test-Agent"
+```
+
+### API usage: `POST /analyze-log-line`
+
+Start the API:
+
+```bash
+uvicorn api.main:app --reload
+```
+
+Send a sanitized log line:
+
+```bash
+curl -X POST http://127.0.0.1:8000/analyze-log-line \
+  -H "Content-Type: application/json" \
+  -d '{"log_line":"203.0.113.50 - - [13/Jun/2026:10:01:12 +0000] \"GET /.env HTTP/1.1\" 404 121 \"-\" \"Scanner-Test-Agent\""}'
+```
+
+Example response:
+
+```json
+{
+  "verdict": "anomalous",
+  "risk_score": 75,
+  "risk_level": "high",
+  "reasons": [
+    "Request targeted sensitive or commonly probed path(s): /.env.",
+    "Request returned 404, which can indicate probing when repeated.",
+    "Requested path ends with a file extension often targeted during scanning.",
+    "User-Agent contains scanner/bot-like wording."
+  ],
+  "parsed": {
+    "ip": "203.0.113.50",
+    "timestamp": "13/Jun/2026:10:01:12 +0000",
+    "method": "GET",
+    "path": "/.env",
+    "protocol": "HTTP/1.1",
+    "status": 404,
+    "size": "121",
+    "referrer": "-",
+    "user_agent": "Scanner-Test-Agent"
+  },
+  "safety_note": "Defensive local log triage only. Use sanitized logs and confirm alerts with human review before taking action."
+}
+```
+
+### Real-time monitoring with watchdog
+
+Install dependencies first:
+
+```bash
+pip install -r requirements.txt
+```
+
+Start the watcher:
+
+```bash
+python monitor_logs.py --file data/sample_logs.log
+```
+
+Open another terminal and append a safe sample suspicious log line:
+
+```bash
+printf '%s\n' '203.0.113.50 - - [13/Jun/2026:10:05:00 +0000] "GET /admin HTTP/1.1" 403 300 "-" "Scanner-Test-Agent"' >> data/sample_logs.log
+```
+
+Expected watcher output:
+
+```text
+ALERT risk=medium verdict=suspicious score=60 ip=203.0.113.50 path=/admin reasons=...
+```
+
+The exact score may vary depending on previous lines analyzed in the current watcher session.
+
+### How to test Phase 6
+
+Check that the sample log file exists:
+
+```bash
+test -f data/sample_logs.log
+```
+
+Check syntax for the new files:
+
+```bash
+python -m py_compile api/log_analyzer.py api/main.py monitor_logs.py
+```
+
+Run a local analyzer smoke test without FastAPI:
+
+```bash
+python - <<'PY'
+from api.log_analyzer import LogAnalyzer
+line = '203.0.113.50 - - [13/Jun/2026:10:01:12 +0000] "GET /.env HTTP/1.1" 404 121 "-" "Scanner-Test-Agent"'
+result = LogAnalyzer().analyze_line(line)
+print(result.verdict, result.risk_score, result.risk_level)
+PY
+```
+
+Start the API and test `/analyze-log-line` with curl as shown above.
+
+Start `monitor_logs.py`, append a new sample line, and confirm that the watcher prints an `ALERT` for medium/high risk events.
+
+### Optional advanced idea: IsolationForest
+
+For a beginner mini-project, the rule-based analyzer is easier to explain and demo. An optional advanced extension is to train an `IsolationForest` on numeric log features such as status code, path length, request frequency, and unique path count. If you add this later, keep it offline/local and clearly explain false positives and false negatives.
+
+### Common errors and fixes
+
+#### `Log line does not match the expected Apache/Nginx-style format`
+
+Make sure the line follows the sample format exactly, including quotes around the request, referrer, and User-Agent.
+
+#### `ModuleNotFoundError: No module named 'watchdog'`
+
+Install dependencies inside your active virtual environment:
+
+```bash
+pip install -r requirements.txt
+```
+
+#### Watcher starts but prints nothing
+
+The watcher only analyzes lines appended after it starts. Open another terminal and append a new line to the watched file.
+
+#### Too many alerts
+
+The rules are intentionally simple and sensitive for learning. Tune thresholds in `api/log_analyzer.py` after testing with more sanitized logs.
+
+### Responsible-use and limitation notes for Phase 6
+
+- Use only sanitized logs, toy logs, or logs you have explicit permission to analyze.
+- Do not monitor production systems for this college mini-project unless your institution explicitly authorizes it.
+- Do not store credentials, tokens, private IP mappings, or personal data in sample logs.
+- Rule-based detection can create false positives and false negatives.
+- Alerts should be reviewed by a human before taking action.
+
+### What to do next
+
+Continue to **Phase 7: Simple frontend**. Phase 7 will add a browser page that can call the text, URL, and log analysis endpoints.

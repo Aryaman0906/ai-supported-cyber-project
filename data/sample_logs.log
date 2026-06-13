@@ -1,0 +1,8 @@
+203.0.113.10 - - [13/Jun/2026:10:00:01 +0000] "GET / HTTP/1.1" 200 512 "-" "Mozilla/5.0"
+198.51.100.22 - - [13/Jun/2026:10:00:05 +0000] "GET /about HTTP/1.1" 200 1024 "-" "Mozilla/5.0"
+203.0.113.50 - - [13/Jun/2026:10:01:11 +0000] "GET /wp-login.php HTTP/1.1" 404 232 "-" "Scanner-Test-Agent"
+203.0.113.50 - - [13/Jun/2026:10:01:12 +0000] "GET /.env HTTP/1.1" 404 121 "-" "Scanner-Test-Agent"
+203.0.113.50 - - [13/Jun/2026:10:01:13 +0000] "GET /admin HTTP/1.1" 403 300 "-" "Scanner-Test-Agent"
+203.0.113.50 - - [13/Jun/2026:10:01:14 +0000] "GET /backup.zip HTTP/1.1" 404 121 "-" "Scanner-Test-Agent"
+198.51.100.35 - - [13/Jun/2026:10:02:00 +0000] "POST /login HTTP/1.1" 200 900 "-" "Mozilla/5.0"
+192.0.2.44 - - [13/Jun/2026:10:03:20 +0000] "GET /products HTTP/1.1" 200 2048 "-" "Mozilla/5.0"

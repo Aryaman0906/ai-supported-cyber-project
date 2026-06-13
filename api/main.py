@@ -14,11 +14,13 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from api.log_analyzer import LogAnalyzer
 from api.text_analyzer import TextPhishingAnalyzer
 from api.url_analyzer import UrlPhishingAnalyzer
 
 text_analyzer = TextPhishingAnalyzer()
 url_analyzer = UrlPhishingAnalyzer()
+log_analyzer = LogAnalyzer()
 text_startup_error: str | None = None
 url_startup_error: str | None = None
 
@@ -115,6 +117,31 @@ class UrlAnalysisResponse(BaseModel):
     safety_note: str
 
 
+class LogAnalysisRequest(BaseModel):
+    """Request body for one sanitized server log line."""
+
+    log_line: str = Field(
+        ...,
+        min_length=1,
+        max_length=5_000,
+        description="One sanitized Apache/Nginx-style access log line to triage.",
+        examples=[
+            '203.0.113.50 - - [13/Jun/2026:10:01:12 +0000] "GET /.env HTTP/1.1" 404 121 "-" "Scanner-Test-Agent"'
+        ],
+    )
+
+
+class LogAnalysisResponse(BaseModel):
+    """Response body returned by POST /analyze-log-line."""
+
+    verdict: str
+    risk_score: int
+    risk_level: str
+    reasons: list[str]
+    parsed: dict[str, Any]
+    safety_note: str
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     """Return API and model status for quick troubleshooting."""
@@ -180,5 +207,23 @@ def analyze_url(request: UrlAnalysisRequest) -> UrlAnalysisResponse:
         extracted_features=result.extracted_features,
         reasons=result.reasons,
         external_checks=result.external_checks,
+        safety_note=result.safety_note,
+    )
+
+
+@app.post("/analyze-log-line", response_model=LogAnalysisResponse)
+def analyze_log_line(request: LogAnalysisRequest) -> LogAnalysisResponse:
+    """Triage one sanitized Apache/Nginx-style log line in real time."""
+    try:
+        result = log_analyzer.analyze_line(request.log_line)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+    return LogAnalysisResponse(
+        verdict=result.verdict,
+        risk_score=result.risk_score,
+        risk_level=result.risk_level,
+        reasons=result.reasons,
+        parsed=result.parsed,
         safety_note=result.safety_note,
     )
