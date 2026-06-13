@@ -1283,3 +1283,86 @@ Use the sample log format from `data/sample_logs.log`. The parser expects quotes
 ### What to do next
 
 Continue to **Phase 8: Report and documentation**. Phase 8 will add the responsible-use write-up and a college-submission-style project explanation.
+
+---
+
+## Phase 8: Report and documentation
+
+### Goal
+
+Phase 8 completes the college-submission documentation. The goal is to clearly explain what the project does, how it works, how to demo it, what its limitations are, and how it must be used responsibly.
+
+### Files added in Phase 8
+
+- `report/responsible_use.md` explains defensive purpose, prohibited uses, privacy, false positives, false negatives, dataset bias, adversarial evasion, human review, and safe deployment.
+- `report/project_explanation.md` provides a college-submission-style explanation with abstract, problem statement, objectives, architecture, methods, run steps, expected outputs, limitations, and future improvements.
+
+### Final demo checklist
+
+Use this checklist before presenting:
+
+1. Create and activate a virtual environment.
+2. Install dependencies with `pip install -r requirements.txt`.
+3. Train the text model with `python train/train_text_model.py`.
+4. Train the URL model with `python train/train_url_model.py`.
+5. Start FastAPI with `uvicorn api.main:app --reload`.
+6. Open Swagger UI at `http://127.0.0.1:8000/docs`.
+7. Test `POST /analyze-text`.
+8. Test `POST /analyze-url`.
+9. Test `POST /analyze-log-line`.
+10. Open `frontend/index.html` and test all three cards.
+11. Start `monitor_logs.py --file data/sample_logs.log`.
+12. Append a safe sample log line and confirm an alert appears.
+13. Explain the responsible-use notes and limitations.
+
+### Suggested college presentation flow
+
+1. **Problem:** phishing and suspicious logs are common defensive security problems.
+2. **Design:** training is offline, prediction is real time, monitoring is local.
+3. **Text model:** TF-IDF + Logistic Regression.
+4. **URL model:** explainable URL features + Random Forest.
+5. **API:** FastAPI endpoints return JSON instantly.
+6. **Monitoring:** watchdog observes a sample log file.
+7. **Frontend:** browser page calls the API.
+8. **Responsible use:** no offensive activity, no private data, human review required.
+9. **Limitations:** small datasets, false positives, false negatives, adversarial evasion.
+10. **Future work:** larger datasets, better tests, safe test inbox integration, optional anomaly models.
+
+### How to test Phase 8
+
+Check that the report files exist:
+
+```bash
+test -f report/responsible_use.md && test -f report/project_explanation.md
+```
+
+Check that the report files are not empty:
+
+```bash
+python - <<'PY'
+from pathlib import Path
+for path in [Path('report/responsible_use.md'), Path('report/project_explanation.md')]:
+    text = path.read_text().strip()
+    if not text:
+        raise SystemExit(f'{path} is empty')
+    print(f'{path}: {len(text.split())} words')
+PY
+```
+
+### Common errors and fixes
+
+#### Report is too long for submission
+
+Use `report/project_explanation.md` as the detailed version, then create a shorter summary from it if your college has a page limit.
+
+#### Teacher asks about safety
+
+Use `report/responsible_use.md` to explain the defensive-only scope, privacy protections, false positives, false negatives, and human review requirement.
+
+#### Demo model results look imperfect
+
+Explain that the starter datasets are small and the project is focused on architecture and responsible real-time workflow, not production-level detection accuracy.
+
+### Final responsible-use reminder
+
+This project is for defensive learning only. Do not use it for phishing generation, credential theft, unauthorized monitoring, scanning, exploitation, or analysis of private data without permission.
