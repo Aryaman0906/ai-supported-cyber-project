@@ -1,0 +1,21 @@
+text,label
+"Team reminder: the security awareness session starts at 3 PM in room 204.",legitimate
+"Your package delivery window is tomorrow between 10 AM and 12 PM.",legitimate
+"Please review the attached meeting agenda before Friday's project check-in.",legitimate
+"Campus library notice: your borrowed book is due next week.",legitimate
+"IT maintenance notice: email service may be unavailable for 15 minutes tonight.",legitimate
+"Your monthly bank statement is ready in the official mobile app.",legitimate
+"Professor Rao shared updated lecture notes on the course portal.",legitimate
+"HR reminder: submit your timesheet through the internal employee portal.",legitimate
+"Your account will be closed today unless you verify your password immediately at a suspicious link.",phishing
+"Urgent action required: confirm your login details to avoid permanent suspension.",phishing
+"Security alert: unusual activity detected, enter your username and password on this external page.",phishing
+"Congratulations, you won a prize; pay a small processing fee to claim it now.",phishing
+"Mailbox storage full: click the unknown link and re-enter your credentials.",phishing
+"Final warning: your payment failed, update card details through this unfamiliar website.",phishing
+"Account validation required within one hour or access will be removed.",phishing
+"Important notice: download the attached form and provide your confidential recovery codes.",phishing
+"Reminder: the coding club workshop registration closes tomorrow.",legitimate
+"Your electricity bill has been generated and can be viewed on the official provider site.",legitimate
+"Urgent refund approved: provide banking details through this shortened link.",phishing
+"Your cloud account is locked; verify identity by sharing your one-time passcode.",phishing
