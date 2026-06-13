@@ -333,3 +333,186 @@ The starter dataset is tiny, so metrics may change a lot when you edit examples.
 ### What to do next
 
 Continue to **Phase 3: Real-time FastAPI endpoint**. Phase 3 will load `models/text_phishing_model.joblib` once at API startup and expose `POST /analyze-text` for instant JSON predictions.
+
+---
+
+## Phase 3: Real-time FastAPI endpoint
+
+### Goal
+
+Phase 3 turns the Phase 2 text model into a real-time API feature. The important requirement is that the FastAPI server loads the trained model **once at startup** and then reuses it for every request.
+
+This means:
+
+- The API does **not** retrain the model during prediction.
+- Users can paste sanitized email/text into an endpoint.
+- The API immediately returns JSON with prediction, confidence, risk level, reasons, and a safety note.
+
+### Files added in Phase 3
+
+- `api/__init__.py` marks `api/` as a Python package.
+- `api/text_analyzer.py` loads the saved text model and contains the reusable prediction logic.
+- `api/main.py` creates the FastAPI app, loads the model during startup, exposes `/health`, and exposes `POST /analyze-text`.
+
+### API behavior
+
+#### `GET /health`
+
+Use this endpoint to check whether the server is running and whether the text model loaded successfully.
+
+Example response when the model is loaded:
+
+```json
+{
+  "status": "ok",
+  "text_model_loaded": true,
+  "detail": null
+}
+```
+
+Example response when the model has not been trained yet:
+
+```json
+{
+  "status": "model_not_loaded",
+  "text_model_loaded": false,
+  "detail": "Text model not found ... Run: python train/train_text_model.py"
+}
+```
+
+#### `POST /analyze-text`
+
+Request body:
+
+```json
+{
+  "text": "Urgent action required: confirm your login details to avoid suspension."
+}
+```
+
+Response body:
+
+```json
+{
+  "prediction": "phishing",
+  "confidence": 0.83,
+  "risk_level": "high",
+  "reasons": [
+    "The offline-trained text model predicted 'phishing' with confidence 0.83.",
+    "The text contains common phishing-pressure or credential-related wording: urgent, login."
+  ],
+  "safety_note": "Defensive analysis only. This result is a learning-project signal, not a final security decision. Review suspicious messages manually."
+}
+```
+
+The exact confidence and prediction can vary when the dataset changes and the model is retrained.
+
+### How to run Phase 3
+
+First, install dependencies and train the Phase 2 model:
+
+```bash
+pip install -r requirements.txt
+python train/train_text_model.py
+```
+
+Then start the FastAPI server:
+
+```bash
+uvicorn api.main:app --reload
+```
+
+The API will be available at:
+
+```text
+http://127.0.0.1:8000
+```
+
+Interactive Swagger UI will be available at:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### How to test Phase 3
+
+#### 1. Health check with curl
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+#### 2. Analyze text with curl
+
+```bash
+curl -X POST http://127.0.0.1:8000/analyze-text \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Urgent action required: confirm your login details to avoid suspension."}'
+```
+
+#### 3. Analyze text with Swagger UI
+
+1. Open `http://127.0.0.1:8000/docs`.
+2. Expand `POST /analyze-text`.
+3. Click **Try it out**.
+4. Paste a safe test message into the JSON body.
+5. Click **Execute**.
+
+#### 4. Analyze text with Postman
+
+1. Set method to `POST`.
+2. Set URL to `http://127.0.0.1:8000/analyze-text`.
+3. Choose **Body → raw → JSON**.
+4. Paste:
+
+```json
+{
+  "text": "Please review the attached meeting agenda before Friday's project check-in."
+}
+```
+
+5. Click **Send**.
+
+### Common errors and fixes
+
+#### `503 Service Unavailable` from `/analyze-text`
+
+The API started, but the model file is missing. Run:
+
+```bash
+python train/train_text_model.py
+```
+
+Then restart Uvicorn.
+
+#### `ModuleNotFoundError: No module named 'fastapi'`
+
+Install dependencies inside your active virtual environment:
+
+```bash
+pip install -r requirements.txt
+```
+
+#### `Address already in use`
+
+Another server is already running on port `8000`. Stop it or use a different port:
+
+```bash
+uvicorn api.main:app --reload --port 8001
+```
+
+#### Swagger UI opens, but prediction fails
+
+Check `/health`. If `text_model_loaded` is `false`, train the model first and restart the API.
+
+### Responsible-use and limitation notes for Phase 3
+
+- Only paste sanitized or user-provided text that you have permission to analyze.
+- Do not connect this endpoint to a real inbox yet.
+- Do not send secrets, passwords, private links, or personal data to the API.
+- The endpoint returns a model-assisted signal, not a final verdict.
+- Human review is still required, especially for medium-risk or low-confidence results.
+
+### What to do next
+
+Continue to **Phase 4: URL phishing detection**. Phase 4 will add URL feature extraction, train a URL classifier, and expose `POST /analyze-url`.
