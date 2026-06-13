@@ -23,3 +23,5 @@ __pycache__/
 credentials.json
 token.json
 reports/generated/
+.local/
+models/*.joblib
