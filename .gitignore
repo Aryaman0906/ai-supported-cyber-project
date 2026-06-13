@@ -19,3 +19,7 @@ __pycache__/
 
 # Generated model artifacts and large local datasets can be added intentionally later
 # Keep placeholder .gitkeep files tracked for now.
+
+credentials.json
+token.json
+reports/generated/

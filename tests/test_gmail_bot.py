@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from api.gmail_client import labels_for_risk, parse_gmail_message
 from api.gmail_scanner import decode_pubsub_push
 from api.report_writer import generate_csv_report, generate_markdown_report
-from api.risk_engine import GmailRiskEngine
+from api.risk_engine import GmailRiskEngine, RiskResult
 from api.storage import InMemoryStorage
 
 class FakeTextResult:
@@ -58,3 +58,53 @@ def test_storage_in_memory():
     storage.save_scan_result("u@example.com", "m1", {"date":"2026-06-13", "risk_level":"low"})
     assert storage.get_account("u@example.com")["last_history_id"] == "1"
     assert len(storage.get_scan_results_for_date("2026-06-13", "u@example.com")) == 1
+
+from api.gmail_poll_worker import generate_local_report, scan_latest_inbox
+
+class FakeExecute:
+    def __init__(self, value=None): self.value = value or {}
+    def execute(self): return self.value
+
+class FakeMessages:
+    def __init__(self):
+        self.modified = []
+        body = base64.urlsafe_b64encode(b"Please verify at http://example-risk.test/login").decode().rstrip("=")
+        self.message = {"id":"poll1","threadId":"th1","internalDate":"1710000000000","labelIds":["INBOX"],"snippet":"verify login","payload":{"headers":[{"name":"From","value":"Tester <sender@example.test>"},{"name":"Subject","value":"Urgent verify"}],"mimeType":"text/plain","body":{"data":body}}}
+    def list(self, **kwargs): return FakeExecute({"messages":[{"id":"poll1"}]})
+    def get(self, **kwargs): return FakeExecute(self.message)
+    def modify(self, **kwargs): self.modified.append(kwargs); return FakeExecute({})
+
+class FakeLabels:
+    def __init__(self):
+        self.labels = [{"name":"AI-Cyber/Scanned","id":"S"},{"name":"AI-Cyber/Low","id":"L"},{"name":"AI-Cyber/Medium","id":"M"},{"name":"AI-Cyber/High","id":"H"}]
+    def list(self, **kwargs): return FakeExecute({"labels": self.labels})
+    def create(self, **kwargs): return FakeExecute({"id":"NEW"})
+
+class FakeUsers:
+    def __init__(self): self._messages = FakeMessages(); self._labels = FakeLabels()
+    def messages(self): return self._messages
+    def labels(self): return self._labels
+
+class FakeGmailService:
+    def __init__(self): self._users = FakeUsers()
+    def users(self): return self._users
+
+class MediumRiskEngine:
+    def analyze(self, text, urls):
+        return RiskResult("medium", 0.7, "phishing", 0.7, [], ["mock medium"], "safe")
+
+def test_local_polling_dry_run_logic(tmp_path):
+    service = FakeGmailService()
+    storage = InMemoryStorage()
+    summary = scan_latest_inbox(service, storage, MediumRiskEngine(), limit=5, dry_run=True)
+    assert summary["scanned_count"] == 1
+    assert summary["medium_count"] == 1
+    assert service.users().messages().modified == []
+
+def test_local_report_generation(tmp_path, monkeypatch):
+    monkeypatch.setattr("api.gmail_poll_worker.REPORT_ROOT", tmp_path)
+    storage = InMemoryStorage()
+    storage.save_scan_result("local-gmail", "m1", {"date":"2026-06-13", "risk_level":"high", "sender_domain":"bad.test", "score":0.9, "url_domains":["bad.test"], "reasons":["reason"]})
+    output = generate_local_report(storage, "2026-06-13")
+    assert Path(output["markdown_path"]).exists()
+    assert Path(output["csv_path"]).exists()
