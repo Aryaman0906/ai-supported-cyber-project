@@ -7,145 +7,151 @@
   <style>
     :root {
       color-scheme: light;
-      --bg: #f4f7fb;
-      --card: #ffffff;
-      --text: #1f2937;
-      --muted: #6b7280;
+      --bg: #eef3fb;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #dbe3ef;
       --primary: #2563eb;
       --primary-dark: #1d4ed8;
-      --border: #dbe3ef;
-      --low: #15803d;
-      --medium: #b45309;
-      --high: #b91c1c;
-      --code: #0f172a;
+      --green: #15803d;
+      --green-soft: #ecfdf3;
+      --amber: #b45309;
+      --amber-soft: #fff7ed;
+      --red: #b91c1c;
+      --red-soft: #fef2f2;
+      --gray: #64748b;
+      --gray-soft: #f1f5f9;
+      --shadow: 0 18px 45px rgba(15, 23, 42, 0.09);
+      --radius: 1.15rem;
+      --code: #020617;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
-      background: var(--bg);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, #dbeafe 0, transparent 34rem), var(--bg);
       color: var(--text);
-      line-height: 1.5;
+      line-height: 1.55;
     }
 
-    header {
-      background: linear-gradient(135deg, #1e3a8a, #2563eb);
+    header.hero {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 48%, #2563eb 100%);
       color: white;
-      padding: 2rem 1rem;
-      text-align: center;
+      padding: 3rem 1rem 4rem;
     }
 
-    header h1 {
-      margin: 0 0 0.5rem;
-      font-size: clamp(1.8rem, 4vw, 3rem);
+    .hero-inner,
+    main {
+      width: min(1180px, calc(100% - 2rem));
+      margin: 0 auto;
     }
 
-    header p {
-      max-width: 900px;
-      margin: 0.5rem auto 0;
+    .hero-pill {
+      display: inline-flex;
+      gap: 0.45rem;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 999px;
+      padding: 0.35rem 0.75rem;
       color: #dbeafe;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .hero h1 {
+      max-width: 860px;
+      margin: 1rem 0 0.65rem;
+      font-size: clamp(2.1rem, 5vw, 4.3rem);
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+    }
+
+    .hero p {
+      max-width: 850px;
+      margin: 0;
+      color: #dbeafe;
+      font-size: clamp(1rem, 2vw, 1.2rem);
     }
 
     main {
-      width: min(1180px, calc(100% - 2rem));
-      margin: 2rem auto;
+      margin-top: -2.2rem;
+      padding-bottom: 3rem;
     }
 
-    .notice {
-      background: #fff7ed;
-      border: 1px solid #fed7aa;
-      border-left: 5px solid #f97316;
-      padding: 1rem;
-      border-radius: 0.75rem;
-      margin-bottom: 1.5rem;
+    .stack { display: grid; gap: 1.25rem; }
+
+    .card {
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      box-shadow: var(--shadow);
     }
 
-    .grid {
+    .card h2,
+    .card h3,
+    .card h4 {
+      margin-top: 0;
+      letter-spacing: -0.02em;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .section-heading p { margin: 0.25rem 0 0; color: var(--muted); }
+
+    .dashboard-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.85fr);
+      gap: 1.25rem;
+      align-items: start;
+    }
+
+    .analysis-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 1rem;
     }
 
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 1rem;
-      padding: 1rem;
-      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
-    }
-
-    .card h2 {
-      margin-top: 0;
-      color: #1e40af;
-    }
-
-    .primary-mode {
-      border: 2px solid #86efac;
-      background: #f0fdf4;
-    }
-
-    .optional-mode {
-      border-style: dashed;
-      background: #fffbeb;
-    }
-
-    .optional-mode summary {
-      cursor: pointer;
-      color: #92400e;
-      font-size: 1.2rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .status-grid,
-    .count-grid {
+    .status-strip {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 0.75rem;
-      margin: 1rem 0;
+      grid-template-columns: minmax(260px, 1fr) auto;
+      gap: 1rem;
+      align-items: center;
+      border-left: 5px solid var(--primary);
     }
 
-    .metric-card,
-    .message-card,
-    .report-card {
-      border: 1px solid var(--border);
-      border-radius: 0.75rem;
-      background: #ffffff;
-      padding: 0.85rem;
+    .primary-demo {
+      border: 2px solid #86efac;
+      background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 42%);
     }
 
-    .metric-card strong {
-      display: block;
-      color: var(--muted);
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
+    .future-section {
+      background: #fffaf0;
+      border-style: dashed;
+      box-shadow: none;
     }
 
-    .muted {
-      color: var(--muted);
-      font-size: 0.88rem;
-    }
-
-    .log-box {
-      max-height: 360px;
-      overflow: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-      background: #020617;
-      color: #d1fae5;
-      font-family: "Courier New", Courier, monospace;
-      font-size: 0.9rem;
-      padding: 1rem;
-      border-radius: 0.75rem;
+    .future-section summary {
+      cursor: pointer;
+      list-style-position: inside;
+      color: #92400e;
+      font-weight: 800;
     }
 
     label {
       display: block;
-      font-weight: 700;
+      font-weight: 800;
       margin-bottom: 0.4rem;
     }
 
@@ -153,48 +159,40 @@
     input[type="text"] {
       width: 100%;
       border: 1px solid var(--border);
-      border-radius: 0.65rem;
-      padding: 0.8rem;
+      border-radius: 0.8rem;
+      padding: 0.85rem;
       font: inherit;
-      min-height: 2.75rem;
+      background: #ffffff;
+      min-height: 2.7rem;
     }
 
-    textarea {
-      resize: vertical;
-      min-height: 150px;
-    }
+    textarea { resize: vertical; min-height: 130px; }
 
     .controls {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.65rem;
       flex-wrap: wrap;
-      margin-top: 0.8rem;
+      margin-top: 0.85rem;
     }
 
     button {
       border: 0;
-      border-radius: 0.65rem;
+      border-radius: 0.8rem;
       background: var(--primary);
       color: white;
-      padding: 0.75rem 1rem;
-      font-weight: 700;
+      padding: 0.72rem 0.95rem;
+      font-weight: 800;
       cursor: pointer;
+      box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
     }
 
-    button:hover {
-      background: var(--primary-dark);
-    }
+    button:hover { background: var(--primary-dark); }
+    button.secondary { background: #334155; box-shadow: none; }
+    button:disabled { opacity: 0.65; cursor: wait; }
 
-    button:disabled {
-      opacity: 0.65;
-      cursor: wait;
-    }
-
-    .hint {
-      color: var(--muted);
-      font-size: 0.92rem;
-    }
+    .hint,
+    .muted { color: var(--muted); font-size: 0.92rem; }
 
     .result {
       margin-top: 1rem;
@@ -203,71 +201,178 @@
     }
 
     .badge {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       border-radius: 999px;
       padding: 0.25rem 0.65rem;
-      font-weight: 700;
+      font-weight: 800;
+      font-size: 0.82rem;
       color: white;
-      background: var(--muted);
+      background: var(--gray);
+      text-transform: capitalize;
     }
 
-    .badge.low {
-      background: var(--low);
-    }
-
+    .badge.high { background: var(--red); }
     .badge.medium,
-    .badge.low-confidence {
-      background: var(--medium);
+    .badge.low-confidence { background: var(--amber); }
+    .badge.low { background: var(--green); }
+    .badge.unknown { background: var(--gray); }
+    .badge.outline { color: var(--primary); background: #dbeafe; }
+
+    .kpi-grid,
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+      gap: 0.75rem;
+      margin: 1rem 0;
     }
 
-    .badge.high {
-      background: var(--high);
+    .kpi,
+    .status-item,
+    .report-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 0.95rem;
+      padding: 0.9rem;
     }
 
+    .kpi strong,
+    .status-item strong {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+
+    .kpi span.value {
+      display: block;
+      font-size: 1.65rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .message-table-wrapper {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 0.95rem;
+      background: #ffffff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 620px;
+    }
+
+    th,
+    td {
+      padding: 0.78rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: var(--surface-soft);
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    .log-box,
     pre {
       white-space: pre-wrap;
       word-break: break-word;
       background: var(--code);
-      color: #e5e7eb;
-      padding: 0.9rem;
-      border-radius: 0.75rem;
-      overflow-x: auto;
+      color: #d1fae5;
+      padding: 1rem;
+      border-radius: 0.95rem;
+      overflow: auto;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.9rem;
     }
 
-    ul {
-      padding-left: 1.3rem;
+    .log-box { max-height: 360px; }
+
+    details.debug-details {
+      margin-top: 1rem;
     }
+
+    details.debug-details summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    ul { padding-left: 1.3rem; }
 
     footer {
       color: var(--muted);
       text-align: center;
       padding: 2rem 1rem;
     }
+
+    @media (max-width: 920px) {
+      .dashboard-grid,
+      .analysis-grid,
+      .status-strip {
+        grid-template-columns: 1fr;
+      }
+      main { width: min(100% - 1rem, 1180px); }
+      .card { padding: 1rem; }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>AI-Assisted Cyber Defender</h1>
-    <p>Defensive-only real-time phishing, URL, and sanitized log triage demo powered by local FastAPI endpoints.</p>
+  <header class="hero">
+    <div class="hero-inner">
+      <span class="hero-pill">🛡️ Defensive learning demo</span>
+      <h1>AI-Assisted Cyber Defender Dashboard</h1>
+      <p>College-project dashboard for real-time phishing text analysis, URL risk checks, sanitized log triage, and a no-billing local Gmail polling bot.</p>
+    </div>
   </header>
 
-  <main>
-    <section class="notice">
-      <strong>Responsible-use reminder:</strong>
-      Use sanitized examples, test URLs, toy logs, or user-provided content only. Do not paste credentials,
-      private reset links, personal inbox data, production secrets, or logs you do not have permission to analyze.
+  <main class="stack">
+    <section class="card status-strip" aria-labelledby="api-settings-heading">
+      <div>
+        <h2 id="api-settings-heading">API status</h2>
+        <p class="hint">Start the backend with <code>uvicorn api.main:app --reload</code>. This dashboard uses only local/static HTML and FastAPI calls.</p>
+        <label for="apiBaseUrl">FastAPI base URL</label>
+        <input id="apiBaseUrl" type="text" value="http://127.0.0.1:8000" />
+      </div>
+      <div>
+        <button type="button" onclick="checkHealth()">Check API health</button>
+        <div id="healthResult" class="result" aria-live="polite"></div>
+      </div>
     </section>
 
-    <section class="card" aria-labelledby="api-settings-heading">
-      <h2 id="api-settings-heading">API settings</h2>
-      <label for="apiBaseUrl">FastAPI base URL</label>
-      <input id="apiBaseUrl" type="text" value="http://127.0.0.1:8000" />
-      <p class="hint">Start the backend with <code>uvicorn api.main:app --reload</code>, then use this page.</p>
-      <button type="button" onclick="checkHealth()">Check API health</button>
-      <div id="healthResult" class="result" aria-live="polite"></div>
+    <section class="card primary-demo" aria-labelledby="polling-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="polling-heading">Local Gmail Polling Bot - Active <span class="badge low">Primary demo</span></h2>
+          <p><strong>This is the no-billing local mode using Gmail API polling and Windows Task Scheduler.</strong> The frontend never displays <code>credentials.json</code>, <code>token.json</code>, OAuth tokens, or full email bodies.</p>
+        </div>
+        <span class="badge outline">Gmail API polling</span>
+      </div>
+      <div class="controls">
+        <button type="button" onclick="pollingStatus()">Refresh status</button>
+        <button type="button" onclick="pollingScanNow()">Run scan now</button>
+        <button type="button" onclick="pollingReportToday()">Generate today's report</button>
+        <button type="button" onclick="pollingLatestLog()">Load latest log</button>
+        <button type="button" onclick="pollingReports()">List reports</button>
+      </div>
+      <div id="pollingResult" class="result" aria-live="polite">
+        <p class="hint">Use <strong>Refresh status</strong> before the demo, then run a scan or open the latest task log.</p>
+      </div>
     </section>
 
-    <section class="grid" aria-label="Analysis tools">
+    <section class="analysis-grid" aria-label="Real-time analysis tools">
       <article class="card">
         <h2>Email/Text analysis</h2>
         <label for="textInput">Paste sanitized email or text</label>
@@ -307,41 +412,34 @@
         </div>
         <div id="logResult" class="result" aria-live="polite"></div>
       </article>
-
-
-      <article class="card primary-mode">
-        <h2>Local Gmail Polling Bot - Active <span class="badge low">Primary</span></h2>
-        <p class="hint"><strong>This is the no-billing local mode using Gmail API polling and Windows Task Scheduler.</strong> Uses local credentials.json/token.json on the backend only; secrets are never shown here.</p>
-        <div class="controls">
-          <button type="button" onclick="pollingStatus()">Refresh status</button>
-          <button type="button" onclick="pollingScanNow()">Run scan now</button>
-          <button type="button" onclick="pollingReportToday()">Generate today's report</button>
-          <button type="button" onclick="pollingLatestLog()">Load latest log</button>
-          <button type="button" onclick="pollingReports()">List reports</button>
-        </div>
-        <div id="pollingResult" class="result" aria-live="polite"></div>
-      </article>
-      <details class="card optional-mode">
-        <summary><strong>Advanced / Future Cloud Deployment</strong> <span class="badge medium">Optional</span></summary>
-        <h2>Optional Cloud Gmail Bot - Not configured</h2>
-        <p class="hint"><strong>Future upgrade path:</strong> This is a future upgrade path using Cloud Run, Pub/Sub, Firestore, Secret Manager, and Cloud Scheduler. It is not used in the current no-billing local demo.</p>
-        <label for="gmailEmail">Authorized Gmail address</label>
-        <input id="gmailEmail" type="text" value="user@example.com" />
-        <p class="hint">Do not put secrets in this page. Cloud mode will return setup/configuration errors until the backend and Google Cloud resources are configured.</p>
-        <div class="controls">
-          <button type="button" onclick="startGmailOAuth()">Start Gmail OAuth</button>
-          <button type="button" onclick="gmailStatus()">Gmail bot status</button>
-          <button type="button" onclick="startGmailWatch()">Start/Renew Gmail watch</button>
-          <button type="button" onclick="manualGmailScan()">Manual scan latest 10</button>
-          <button type="button" onclick="generateTodayReport()">Generate today's report</button>
-        </div>
-        <div id="gmailResult" class="result" aria-live="polite"></div>
-      </details>
     </section>
+
+    <details class="card future-section">
+      <summary>Advanced / Future Cloud Deployment <span class="badge medium">Optional</span></summary>
+      <div class="dashboard-grid" style="margin-top: 1rem;">
+        <div>
+          <h2>Optional Cloud Gmail Bot - Not configured</h2>
+          <p class="hint">This is a future upgrade path using Cloud Run, Pub/Sub, Firestore, Secret Manager, and Cloud Scheduler. It is not used in the current no-billing local demo.</p>
+          <p class="hint">Keep this collapsed during the local hackathon demo unless you are specifically explaining the cloud architecture.</p>
+        </div>
+        <div>
+          <label for="gmailEmail">Authorized Gmail address</label>
+          <input id="gmailEmail" type="text" value="user@example.com" />
+          <div class="controls">
+            <button type="button" onclick="startGmailOAuth()">Start Gmail OAuth</button>
+            <button type="button" onclick="gmailStatus()">Gmail bot status</button>
+            <button type="button" onclick="startGmailWatch()">Start/Renew Gmail watch</button>
+            <button type="button" onclick="manualGmailScan()">Manual scan latest 10</button>
+            <button type="button" onclick="generateTodayReport()">Generate today's report</button>
+          </div>
+          <div id="gmailResult" class="result" aria-live="polite"></div>
+        </div>
+      </div>
+    </details>
   </main>
 
   <footer>
-    College mini-project demo. Defensive learning only. Human review required for real security decisions.
+    Defensive cybersecurity mini-project. Human review is required for real security decisions.
   </footer>
 
   <script>
@@ -350,7 +448,7 @@
     }
 
     function escapeHtml(value) {
-      return String(value)
+      return String(value ?? "")
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
@@ -359,7 +457,8 @@
     }
 
     function riskBadge(riskLevel) {
-      const safeRisk = escapeHtml(riskLevel || "unknown");
+      const risk = String(riskLevel || "unknown").toLowerCase();
+      const safeRisk = escapeHtml(risk);
       return `<span class="badge ${safeRisk}">${safeRisk}</span>`;
     }
 
@@ -371,7 +470,7 @@
 
     function rawJsonDetails(data) {
       return `
-        <details>
+        <details class="debug-details">
           <summary>Show raw JSON for debugging</summary>
           <pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>
         </details>
@@ -379,8 +478,9 @@
     }
 
     function fileList(title, files) {
-      const items = Array.isArray(files) && files.length
-        ? files.map((file) => `<li><code>${escapeHtml(file)}</code></li>`).join("")
+      const fileArray = Array.isArray(files) ? files : [];
+      const items = fileArray.length
+        ? fileArray.map((file) => `<li><code>${escapeHtml(file)}</code></li>`).join("")
         : "<li>None found.</li>";
       return `<p><strong>${escapeHtml(title)}</strong></p><ul>${items}</ul>`;
     }
@@ -398,10 +498,7 @@
         <p><strong>Risk:</strong> ${riskBadge(riskLevel)}</p>
         <p><strong>Reasons:</strong></p>
         <ul>${reasonItems || "<li>No reasons returned.</li>"}</ul>
-        <details>
-          <summary>Raw JSON response</summary>
-          <pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>
-        </details>
+        ${rawJsonDetails(data)}
       `;
     }
 
@@ -474,7 +571,6 @@
       }
     }
 
-
     function gmailEmail() {
       return document.getElementById("gmailEmail").value;
     }
@@ -524,7 +620,6 @@
       }
     }
 
-
     function renderPollingStatus(data) {
       const container = document.getElementById("pollingResult");
       const latestFiles = data.latest_report_files || {};
@@ -532,13 +627,13 @@
         <h3>Local polling status</h3>
         <p><span class="badge low">Active</span> ${escapeHtml(data.automation_note || "Windows Task Scheduler expected for automation.")}</p>
         <div class="status-grid">
-          <div class="metric-card"><strong>Bot mode</strong>${escapeHtml(data.bot_mode || "local polling")}</div>
-          <div class="metric-card"><strong>credentials.json</strong>${availabilityBadge(data.credentials_json_exists)}</div>
-          <div class="metric-card"><strong>token.json</strong>${availabilityBadge(data.token_json_exists)}</div>
-          <div class="metric-card"><strong>reports/generated</strong>${availabilityBadge(data.reports_generated_exists)}</div>
-          <div class="metric-card"><strong>Latest task log</strong>${escapeHtml(data.latest_task_log_modified_time || "not found")}</div>
-          <div class="metric-card"><strong>Latest report date</strong>${escapeHtml(data.latest_report_date || "none yet")}</div>
-          <div class="metric-card"><strong>Report count</strong>${escapeHtml(data.report_count ?? 0)}</div>
+          <div class="status-item"><strong>Bot mode</strong>${escapeHtml(data.bot_mode || "local polling")}</div>
+          <div class="status-item"><strong>credentials.json</strong>${availabilityBadge(data.credentials_json_exists)}</div>
+          <div class="status-item"><strong>token.json</strong>${availabilityBadge(data.token_json_exists)}</div>
+          <div class="status-item"><strong>reports/generated</strong>${availabilityBadge(data.reports_generated_exists)}</div>
+          <div class="status-item"><strong>Latest task log</strong>${escapeHtml(data.latest_task_log_modified_time || "not found")}</div>
+          <div class="status-item"><strong>Latest report date</strong>${escapeHtml(data.latest_report_date || "none yet")}</div>
+          <div class="status-item"><strong>Report count</strong>${escapeHtml(data.report_count ?? 0)}</div>
         </div>
         <div class="report-card">
           <h4>Latest report files</h4>
@@ -552,37 +647,35 @@
 
     function renderPollingScan(data) {
       const container = document.getElementById("pollingResult");
-      const rows = (data.results || []).slice(0, 10).map((result) => {
-        if (result.skipped) {
-          return `
-            <div class="message-card">
-              <p><strong>Message:</strong> <code>${escapeHtml(result.message_id || "unknown")}</code></p>
-              <p>${riskBadge("medium")} Skipped — ${escapeHtml(result.reason || "Already scanned")}</p>
-            </div>
-          `;
-        }
-        return `
-          <div class="message-card">
-            <p><strong>Message:</strong> <code>${escapeHtml(result.message_id || "unknown")}</code></p>
-            <p><strong>Sender:</strong> ${escapeHtml(result.sender || "unknown")}</p>
-            <p><strong>Subject:</strong> ${escapeHtml(result.subject_preview || "(no subject)")}</p>
-            <p><strong>Risk:</strong> ${riskBadge(result.risk_level || "unknown")} <strong>Score:</strong> ${escapeHtml(result.score ?? "n/a")}</p>
-            <p class="muted">Reason: ${escapeHtml((result.reasons || ["No reason returned."])[0])}</p>
-          </div>
-        `;
-      }).join("");
+      const analyzedResults = (data.results || []).filter((result) => !result.skipped).slice(0, 5);
+      const rows = analyzedResults.map((result) => `
+        <tr>
+          <td>${escapeHtml(result.sender || "unknown")}</td>
+          <td>${escapeHtml(result.subject_preview || "(no subject)")}</td>
+          <td>${riskBadge(result.risk_level || "unknown")}</td>
+          <td>${escapeHtml(result.score ?? "n/a")}</td>
+          <td>${escapeHtml((result.reasons || ["No reason returned."])[0])}</td>
+        </tr>
+      `).join("");
+      const moreCount = Math.max(0, (data.results || []).filter((result) => !result.skipped).length - analyzedResults.length);
       container.innerHTML = `
         <h3>Scan summary</h3>
-        <div class="count-grid">
-          <div class="metric-card"><strong>Scanned</strong>${escapeHtml(data.scanned_count ?? 0)}</div>
-          <div class="metric-card"><strong>Skipped</strong>${escapeHtml(data.skipped_count ?? 0)}</div>
-          <div class="metric-card"><strong>High</strong><span class="badge high">${escapeHtml(data.high_count ?? 0)}</span></div>
-          <div class="metric-card"><strong>Medium</strong><span class="badge medium">${escapeHtml(data.medium_count ?? 0)}</span></div>
-          <div class="metric-card"><strong>Low</strong><span class="badge low">${escapeHtml(data.low_count ?? 0)}</span></div>
-          <div class="metric-card"><strong>Unknown</strong>${escapeHtml(data.unknown_count ?? 0)}</div>
+        <div class="kpi-grid">
+          <div class="kpi"><strong>Scanned</strong><span class="value">${escapeHtml(data.scanned_count ?? 0)}</span></div>
+          <div class="kpi"><strong>Skipped</strong><span class="value">${escapeHtml(data.skipped_count ?? 0)}</span></div>
+          <div class="kpi"><strong>High</strong><span class="value" style="color: var(--red);">${escapeHtml(data.high_count ?? 0)}</span></div>
+          <div class="kpi"><strong>Medium</strong><span class="value" style="color: var(--amber);">${escapeHtml(data.medium_count ?? 0)}</span></div>
+          <div class="kpi"><strong>Low</strong><span class="value" style="color: var(--green);">${escapeHtml(data.low_count ?? 0)}</span></div>
+          <div class="kpi"><strong>Unknown</strong><span class="value" style="color: var(--gray);">${escapeHtml(data.unknown_count ?? 0)}</span></div>
         </div>
-        <h4>Recent message results</h4>
-        ${rows || '<p class="hint">No message results returned.</p>'}
+        <h4>Newly scanned messages</h4>
+        <p class="hint">Skipped emails are summarized above only. Showing up to 5 newly analyzed messages for presentation safety.${moreCount ? ` ${moreCount} more hidden.` : ""}</p>
+        <div class="message-table-wrapper">
+          <table>
+            <thead><tr><th>Sender</th><th>Subject</th><th>Risk</th><th>Score</th><th>Main reason</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="5">No newly analyzed messages in this run.</td></tr>'}</tbody>
+          </table>
+        </div>
         ${rawJsonDetails(data)}
       `;
     }
@@ -616,7 +709,7 @@
       container.innerHTML = `
         <h3>Generated reports</h3>
         <p class="muted">Reports directory: <code>${escapeHtml(data.reports_dir || "reports/generated")}</code></p>
-        ${cards || '<p class="hint">No local Gmail polling reports found yet.</p>'}
+        <div class="stack">${cards || '<p class="hint">No local Gmail polling reports found yet.</p>'}</div>
         ${rawJsonDetails(data)}
       `;
     }
@@ -672,7 +765,6 @@
         renderError("pollingResult", error);
       }
     }
-
   </script>
 </body>
 </html>
