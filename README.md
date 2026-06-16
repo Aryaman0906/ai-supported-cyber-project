@@ -1,6 +1,6 @@
 # AI-Assisted Defensive Cybersecurity Mini-Project
 
-Real-time phishing analysis and log triage project for defensive cybersecurity learning.
+Near-real-time phishing analysis and log triage project for defensive cybersecurity learning.
 
 > **Responsible-use scope:** This project is defensive only. It is designed for sanitized datasets, sample emails, test URLs, sample logs, and user-provided input. It must not be used to generate phishing content, steal credentials, attack websites, scrape real inboxes without permission, or perform harmful activity.
 
