@@ -59,7 +59,7 @@ def test_storage_in_memory():
     assert storage.get_account("u@example.com")["last_history_id"] == "1"
     assert len(storage.get_scan_results_for_date("2026-06-13", "u@example.com")) == 1
 
-from api.gmail_poll_worker import format_report_output, format_scan_summary, generate_local_report, scan_latest_inbox
+from api.gmail_poll_worker import format_report_output, format_scan_summary, generate_local_report, parse_drive_folder_id, scan_latest_inbox
 
 class FakeExecute:
     def __init__(self, value=None): self.value = value or {}
@@ -142,6 +142,27 @@ def test_local_report_console_format():
     output = format_report_output({"date": "2026-06-15", "markdown_path": "reports/generated/2026-06-15/report.md", "csv_path": "reports/generated/2026-06-15/report.csv"})
     assert "GMAIL POLLING REPORT GENERATED" in output
     assert "reports/generated/2026-06-15/report.md" in output
+
+def test_parse_drive_folder_id_from_url_and_raw_id():
+    folder_id = "1Ko8e6ldd3TasM-JQXpJO0wyYJ8S4u8EM"
+    url = f"https://drive.google.com/drive/folders/{folder_id}?usp=drive_link"
+    assert parse_drive_folder_id(url) == folder_id
+    assert parse_drive_folder_id(folder_id) == folder_id
+
+def test_local_report_console_format_includes_drive_links():
+    output = format_report_output({
+        "date": "2026-06-15",
+        "markdown_path": "reports/generated/2026-06-15/report.md",
+        "csv_path": "reports/generated/2026-06-15/report.csv",
+        "drive": {
+            "folder_id": "folder123",
+            "markdown": {"webViewLink": "https://drive.example/markdown"},
+            "csv": {"webViewLink": "https://drive.example/csv"},
+        },
+    })
+    assert "DRIVE UPLOAD COMPLETE" in output
+    assert "https://drive.example/markdown" in output
+    assert "https://drive.example/csv" in output
 
 from api import polling_dashboard
 
