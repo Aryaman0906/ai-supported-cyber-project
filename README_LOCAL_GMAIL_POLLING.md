@@ -1,11 +1,11 @@
 # Local Gmail Polling Mode (No Billing Required)
 
-This mode is for a personal/local demo that uses only Gmail API and optionally Drive API through local OAuth files. It does **not** require Cloud Run, Pub/Sub, Firestore, Secret Manager, or Cloud Scheduler.
+This mode is for a personal/local demo that uses Gmail API and Drive API through local OAuth files. It does **not** require Cloud Run, Pub/Sub, Firestore, Secret Manager, or Cloud Scheduler.
 
 ## What it does
 
 ```text
-Local terminal command
+Windows Task Scheduler or local terminal command
 → Gmail API list latest INBOX messages
 → skip messages already labeled AI-Cyber/Scanned
 → fetch message metadata/body
@@ -14,9 +14,20 @@ Local terminal command
 → apply AI-Cyber labels in Gmail
 → save privacy-aware scan metadata locally
 → generate Markdown/CSV daily reports under reports/generated/YYYY-MM-DD/
+→ upload the Markdown/CSV reports to the configured Google Drive folder
 ```
 
 The worker never opens links, downloads attachments, sends replies, deletes email, or performs scanning/exploitation.
+
+## Target Drive folder
+
+The scheduled batch file is configured to upload daily reports to this folder:
+
+```text
+https://drive.google.com/drive/folders/1Ko8e6ldd3TasM-JQXpJO0wyYJ8S4u8EM?usp=drive_link
+```
+
+The worker also accepts either a Drive folder URL or a raw folder ID through `--drive-folder`.
 
 ## Files used locally
 
@@ -29,12 +40,14 @@ Both files are ignored by Git.
 
 ## Required OAuth scopes
 
-The local worker uses the same minimum scopes as the Cloud Run bot:
+The local worker uses these scopes:
 
 - `https://www.googleapis.com/auth/gmail.modify`
 - `https://www.googleapis.com/auth/drive.file`
 
 It does **not** use the full `https://mail.google.com/` scope.
+
+If you created `token.json` before adding Drive support, delete `token.json` and run the worker again so Google asks for the Drive permission too.
 
 ## Windows PowerShell setup
 
@@ -84,9 +97,9 @@ If model files are missing, the worker still runs but returns `unknown` analysis
 python -m api.gmail_poll_worker --once --limit 5
 ```
 
-On first run, your browser opens for Gmail consent. After login, `token.json` is saved locally.
+On first run, your browser opens for Gmail/Drive consent. After login, `token.json` is saved locally.
 
-### 6. Run continuous polling
+### 6. Run continuous polling manually
 
 ```powershell
 python -m api.gmail_poll_worker --loop --interval 300 --limit 10
@@ -94,7 +107,7 @@ python -m api.gmail_poll_worker --loop --interval 300 --limit 10
 
 This checks the latest 10 inbox messages every 300 seconds.
 
-### 7. Generate today's report
+### 7. Generate today's local report
 
 ```powershell
 python -m api.gmail_poll_worker --report-today
@@ -105,6 +118,21 @@ Reports are written to:
 ```text
 reports/generated/YYYY-MM-DD/gmail_poll_report.md
 reports/generated/YYYY-MM-DD/gmail_poll_report.csv
+```
+
+### 8. Generate today's report and upload it to Drive
+
+```powershell
+python -m api.gmail_poll_worker --report-today --upload-drive --drive-folder "https://drive.google.com/drive/folders/1Ko8e6ldd3TasM-JQXpJO0wyYJ8S4u8EM?usp=drive_link"
+```
+
+Expected terminal output includes:
+
+```text
+GMAIL POLLING REPORT GENERATED
+DRIVE UPLOAD COMPLETE
+Markdown URL: ...
+CSV URL     : ...
 ```
 
 ## Optional dry run
@@ -135,6 +163,7 @@ If analysis is unknown, it applies medium review behavior so you can inspect man
 - Attachments are ignored and are not downloaded.
 - Links are extracted as strings but are not opened.
 - The tool is an assistive signal only; human review is required.
+- Drive upload sends only the generated Markdown/CSV report files to the configured Drive folder.
 
 ## Troubleshooting
 
@@ -154,6 +183,15 @@ Delete `token.json` and run the worker again to complete OAuth from scratch.
 
 Confirm Gmail API is enabled, your account is added as a test user in OAuth consent, and the OAuth client/scopes are correct.
 
+### Drive upload returns 403
+
+Check these items:
+
+1. Drive API is enabled in Google Cloud Console.
+2. The same Google account used during OAuth has access to the target folder.
+3. Delete `token.json` and run again so the `drive.file` scope is granted.
+4. If the folder was created outside the app and Drive still refuses access, create or select a folder that the OAuth user can write to, then pass its folder link with `--drive-folder`.
+
 ### Messages are skipped
 
 Messages already labeled `AI-Cyber/Scanned` are skipped by default. Use `--force` if you intentionally want to re-scan.
@@ -163,7 +201,7 @@ Messages already labeled `AI-Cyber/Scanned` are skipped by default. Use `--force
 Run a scan first, then run:
 
 ```powershell
-python -m api.gmail_poll_worker --report-today
+python -m api.gmail_poll_worker --report-today --upload-drive
 ```
 
 ## Reference
@@ -205,6 +243,13 @@ The dashboard never displays the contents of `credentials.json` or `token.json`.
 
 If you automate polling with Windows Task Scheduler, configure the task to run your batch file, for example `run_gmail_poll_once.bat`, every few minutes.
 
+The committed batch file now runs both steps:
+
+```text
+python -m api.gmail_poll_worker --once --limit 20
+python -m api.gmail_poll_worker --report-today --upload-drive --drive-folder "<target Drive folder>"
+```
+
 To verify it is working:
 
 1. Open **Task Scheduler**.
@@ -212,7 +257,9 @@ To verify it is working:
 3. Confirm **Last Run Time** updates.
 4. Confirm **Last Run Result** is `0x0`.
 5. Check that `reports/generated/task-log.txt` is being updated.
-6. Open the local dashboard and click **Load latest log**.
+6. Confirm `task-log.txt` contains `DRIVE UPLOAD COMPLETE`.
+7. Open the Drive folder and confirm the latest Markdown/CSV report files appear.
+8. Open the local dashboard and click **Load latest log**.
 
 ## Reading task-log.txt manually
 
