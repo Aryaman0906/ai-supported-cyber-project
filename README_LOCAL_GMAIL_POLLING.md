@@ -13,11 +13,21 @@ Windows Task Scheduler or local terminal command
 → run local text/URL risk engine when models are available
 → apply AI-Cyber labels in Gmail
 → save privacy-aware scan metadata locally
-→ generate Markdown/CSV daily reports under reports/generated/YYYY-MM-DD/
-→ upload the Markdown/CSV reports to the configured Google Drive folder
+→ generate Markdown/CSV/XLSX daily reports under reports/generated/YYYY-MM-DD/
+→ upload the Markdown/CSV/XLSX reports to the configured Google Drive folder
 ```
 
 The worker never opens links, downloads attachments, sends replies, deletes email, or performs scanning/exploitation.
+
+## Report formats
+
+The local worker generates three report files:
+
+- `gmail_poll_report.md` — readable summary for documentation/submission.
+- `gmail_poll_report.csv` — raw export format for data processing.
+- `gmail_poll_report.xlsx` — formatted spreadsheet for presentation in Drive/Excel, with wrapped columns, filters, frozen header, and risk-level highlighting.
+
+Use the `.xlsx` file for screenshots and presentation because CSV files cannot store column widths, wrapping, colors, or filters.
 
 ## Target Drive folder
 
@@ -118,6 +128,7 @@ Reports are written to:
 ```text
 reports/generated/YYYY-MM-DD/gmail_poll_report.md
 reports/generated/YYYY-MM-DD/gmail_poll_report.csv
+reports/generated/YYYY-MM-DD/gmail_poll_report.xlsx
 ```
 
 ### 8. Generate today's report and upload it to Drive
@@ -133,6 +144,7 @@ GMAIL POLLING REPORT GENERATED
 DRIVE UPLOAD COMPLETE
 Markdown URL: ...
 CSV URL     : ...
+XLSX URL    : ...
 ```
 
 ## Optional dry run
@@ -163,7 +175,7 @@ If analysis is unknown, it applies medium review behavior so you can inspect man
 - Attachments are ignored and are not downloaded.
 - Links are extracted as strings but are not opened.
 - The tool is an assistive signal only; human review is required.
-- Drive upload sends only the generated Markdown/CSV report files to the configured Drive folder.
+- Drive upload sends only the generated Markdown/CSV/XLSX report files to the configured Drive folder.
 
 ## Troubleshooting
 
@@ -203,6 +215,10 @@ Run a scan first, then run:
 ```powershell
 python -m api.gmail_poll_worker --report-today --upload-drive
 ```
+
+### CSV still looks plain
+
+That is expected. CSV is a raw data format and cannot store formatting. Open `gmail_poll_report.xlsx` for the formatted presentation-friendly report.
 
 ## Reference
 
@@ -258,8 +274,9 @@ To verify it is working:
 4. Confirm **Last Run Result** is `0x0`.
 5. Check that `reports/generated/task-log.txt` is being updated.
 6. Confirm `task-log.txt` contains `DRIVE UPLOAD COMPLETE`.
-7. Open the Drive folder and confirm the latest Markdown/CSV report files appear.
-8. Open the local dashboard and click **Load latest log**.
+7. Open the Drive folder and confirm the latest Markdown/CSV/XLSX report files appear.
+8. Open the `.xlsx` report for the formatted spreadsheet view.
+9. Open the local dashboard and click **Load latest log**.
 
 ## Reading task-log.txt manually
 
