@@ -39,6 +39,7 @@ def list_report_folders(reports_dir: Path = REPORTS_DIR) -> list[dict[str, Any]]
             continue
         markdown_files = sorted(str(path) for path in folder.glob("*.md"))
         csv_files = sorted(str(path) for path in folder.glob("*.csv"))
+        xlsx_files = sorted(str(path) for path in folder.glob("*.xlsx"))
         folders.append(
             {
                 "date": folder.name,
@@ -46,6 +47,7 @@ def list_report_folders(reports_dir: Path = REPORTS_DIR) -> list[dict[str, Any]]
                 "modified_time": modified_time(folder),
                 "markdown_files": markdown_files,
                 "csv_files": csv_files,
+                "xlsx_files": xlsx_files,
             }
         )
     return folders

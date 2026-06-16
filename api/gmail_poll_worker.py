@@ -34,7 +34,7 @@ from api.gmail_client import (
     labels_for_risk,
     parse_gmail_message,
 )
-from api.report_writer import generate_csv_report, generate_markdown_report
+from api.report_writer import generate_csv_report, generate_markdown_report, generate_xlsx_report_bytes
 from api.risk_engine import GmailRiskEngine, RiskResult
 from api.storage import LocalJsonStorage, utc_now_iso
 
@@ -313,15 +313,22 @@ def upload_file_to_drive(service: Any, file_path: Path, folder_id: str, mime_typ
 
 
 def upload_report_to_drive(report: dict[str, Any], folder: str | None = None) -> dict[str, Any]:
-    """Upload the generated Markdown and CSV reports to the configured Drive folder."""
+    """Upload the generated Markdown, CSV, and XLSX reports to the configured Drive folder."""
     folder_id = parse_drive_folder_id(folder or DEFAULT_DRIVE_REPORT_FOLDER)
     drive_service = build_local_drive_service()
     markdown_path = Path(report["markdown_path"])
     csv_path = Path(report["csv_path"])
+    xlsx_path = Path(report["xlsx_path"])
     report["drive"] = {
         "folder_id": folder_id,
         "markdown": upload_file_to_drive(drive_service, markdown_path, folder_id, "text/markdown"),
         "csv": upload_file_to_drive(drive_service, csv_path, folder_id, "text/csv"),
+        "xlsx": upload_file_to_drive(
+            drive_service,
+            xlsx_path,
+            folder_id,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ),
     }
     return report
 
@@ -334,6 +341,7 @@ def format_report_output(report: dict[str, Any]) -> str:
         f"Report date : {report.get('date', 'unknown')}",
         f"Markdown    : {report.get('markdown_path', 'not generated')}",
         f"CSV         : {report.get('csv_path', 'not generated')}",
+        f"XLSX        : {report.get('xlsx_path', 'not generated')}",
     ]
 
     drive = report.get("drive") or {}
@@ -346,6 +354,7 @@ def format_report_output(report: dict[str, Any]) -> str:
                 f"Folder ID   : {drive.get('folder_id', 'unknown')}",
                 f"Markdown URL: {(drive.get('markdown') or {}).get('webViewLink', 'not returned')}",
                 f"CSV URL     : {(drive.get('csv') or {}).get('webViewLink', 'not returned')}",
+                f"XLSX URL    : {(drive.get('xlsx') or {}).get('webViewLink', 'not returned')}",
             ]
         )
 
@@ -353,16 +362,18 @@ def format_report_output(report: dict[str, Any]) -> str:
 
 
 def generate_local_report(storage: LocalJsonStorage, report_date: str | None = None) -> dict[str, str]:
-    """Generate Markdown and CSV reports under reports/generated/YYYY-MM-DD/."""
+    """Generate Markdown, CSV, and formatted XLSX reports under reports/generated/YYYY-MM-DD/."""
     report_date = report_date or date.today().isoformat()
     results = storage.get_scan_results_for_date(report_date, email="local-gmail")
     output_dir = REPORT_ROOT / report_date
     output_dir.mkdir(parents=True, exist_ok=True)
     markdown_path = output_dir / "gmail_poll_report.md"
     csv_path = output_dir / "gmail_poll_report.csv"
+    xlsx_path = output_dir / "gmail_poll_report.xlsx"
     markdown_path.write_text(generate_markdown_report(report_date, results), encoding="utf-8")
     csv_path.write_text(generate_csv_report(results), encoding="utf-8")
-    return {"date": report_date, "markdown_path": str(markdown_path), "csv_path": str(csv_path)}
+    xlsx_path.write_bytes(generate_xlsx_report_bytes(report_date, results))
+    return {"date": report_date, "markdown_path": str(markdown_path), "csv_path": str(csv_path), "xlsx_path": str(xlsx_path)}
 
 
 def run_once(limit: int, force: bool = False, dry_run: bool = False) -> dict[str, Any]:
@@ -387,12 +398,12 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--once", action="store_true", help="Scan the latest inbox messages once.")
     mode.add_argument("--loop", action="store_true", help="Continuously poll Gmail inbox.")
-    mode.add_argument("--report-today", action="store_true", help="Generate today's local Markdown/CSV report.")
+    mode.add_argument("--report-today", action="store_true", help="Generate today's local Markdown/CSV/XLSX report.")
     parser.add_argument("--interval", type=int, default=300, help="Polling interval in seconds for --loop.")
     parser.add_argument("--limit", type=int, default=10, help="Latest inbox message count to scan, max 100.")
     parser.add_argument("--force", action="store_true", help="Re-scan messages already labeled AI-Cyber/Scanned.")
     parser.add_argument("--dry-run", action="store_true", help="Analyze and store metadata without applying Gmail labels.")
-    parser.add_argument("--upload-drive", action="store_true", help="After --report-today, upload the Markdown/CSV report to Google Drive.")
+    parser.add_argument("--upload-drive", action="store_true", help="After --report-today, upload the Markdown/CSV/XLSX report to Google Drive.")
     parser.add_argument(
         "--drive-folder",
         default=DEFAULT_DRIVE_REPORT_FOLDER,

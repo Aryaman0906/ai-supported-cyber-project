@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import base64, json
+from io import BytesIO
 from pathlib import Path
 import sys
+
+from openpyxl import load_workbook
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from api.gmail_client import labels_for_risk, parse_gmail_message
 from api.gmail_scanner import decode_pubsub_push
-from api.report_writer import generate_csv_report, generate_markdown_report
+from api.report_writer import generate_csv_report, generate_markdown_report, generate_xlsx_report_bytes
 from api.risk_engine import GmailRiskEngine, RiskResult
 from api.storage import InMemoryStorage
 
@@ -51,6 +54,16 @@ def test_report_generation():
     results = [{"message_id":"m1","date":"2026-06-13","sender_domain":"bad.test","risk_level":"high","score":0.9,"url_domains":["bad.test"],"reasons":["reason"]}]
     assert "High risk: 1" in generate_markdown_report("2026-06-13", results)
     assert "bad.test" in generate_csv_report(results)
+
+def test_xlsx_report_generation_is_formatted():
+    results = [{"message_id":"m1","date":"2026-06-13","sender_domain":"bad.test","risk_level":"high","score":0.9,"url_domains":["bad.test"],"reasons":["reason"]}]
+    workbook = load_workbook(BytesIO(generate_xlsx_report_bytes("2026-06-13", results)))
+    sheet = workbook["Gmail Report"]
+    assert sheet["A1"].value == "AI Cyber Daily Gmail Report - 2026-06-13"
+    assert sheet["A10"].value == "message_id"
+    assert sheet["G11"].alignment.wrap_text is True
+    assert sheet.freeze_panes == "A11"
+    assert sheet.auto_filter.ref == "A10:G11"
 
 def test_storage_in_memory():
     storage = InMemoryStorage()
@@ -108,6 +121,7 @@ def test_local_report_generation(tmp_path, monkeypatch):
     output = generate_local_report(storage, "2026-06-13")
     assert Path(output["markdown_path"]).exists()
     assert Path(output["csv_path"]).exists()
+    assert Path(output["xlsx_path"]).exists()
 
 def test_local_polling_console_format_hides_skipped_ids():
     summary = {
@@ -139,9 +153,10 @@ def test_local_polling_console_format_hides_skipped_ids():
     assert "Mock reason" in output
 
 def test_local_report_console_format():
-    output = format_report_output({"date": "2026-06-15", "markdown_path": "reports/generated/2026-06-15/report.md", "csv_path": "reports/generated/2026-06-15/report.csv"})
+    output = format_report_output({"date": "2026-06-15", "markdown_path": "reports/generated/2026-06-15/report.md", "csv_path": "reports/generated/2026-06-15/report.csv", "xlsx_path": "reports/generated/2026-06-15/report.xlsx"})
     assert "GMAIL POLLING REPORT GENERATED" in output
     assert "reports/generated/2026-06-15/report.md" in output
+    assert "reports/generated/2026-06-15/report.xlsx" in output
 
 def test_parse_drive_folder_id_from_url_and_raw_id():
     folder_id = "1Ko8e6ldd3TasM-JQXpJO0wyYJ8S4u8EM"
@@ -154,15 +169,18 @@ def test_local_report_console_format_includes_drive_links():
         "date": "2026-06-15",
         "markdown_path": "reports/generated/2026-06-15/report.md",
         "csv_path": "reports/generated/2026-06-15/report.csv",
+        "xlsx_path": "reports/generated/2026-06-15/report.xlsx",
         "drive": {
             "folder_id": "folder123",
             "markdown": {"webViewLink": "https://drive.example/markdown"},
             "csv": {"webViewLink": "https://drive.example/csv"},
+            "xlsx": {"webViewLink": "https://drive.example/xlsx"},
         },
     })
     assert "DRIVE UPLOAD COMPLETE" in output
     assert "https://drive.example/markdown" in output
     assert "https://drive.example/csv" in output
+    assert "https://drive.example/xlsx" in output
 
 from api import polling_dashboard
 
@@ -191,10 +209,12 @@ def test_polling_report_listing_ignores_string_folder(tmp_path):
     dated.mkdir()
     (dated / "gmail_poll_report.md").write_text("# report")
     (dated / "gmail_poll_report.csv").write_text("message_id")
+    (dated / "gmail_poll_report.xlsx").write_bytes(generate_xlsx_report_bytes("2026-06-13", []))
     rows = polling_dashboard.list_report_folders(reports)
     assert [row["date"] for row in rows] == ["2026-06-13"]
     assert rows[0]["markdown_files"]
     assert rows[0]["csv_files"]
+    assert rows[0]["xlsx_files"]
 
 def test_polling_latest_log_reads_last_100_lines(tmp_path):
     log = tmp_path / "task-log.txt"
