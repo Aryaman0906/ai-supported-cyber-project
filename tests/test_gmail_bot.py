@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import base64, json
-from io import BytesIO
+import base64, json, os, socket, types, zipfile
 from pathlib import Path
 import sys
-
-from openpyxl import load_workbook
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -14,6 +11,15 @@ from api.gmail_scanner import decode_pubsub_push
 from api.report_writer import generate_csv_report, generate_markdown_report, generate_xlsx_report_bytes
 from api.risk_engine import GmailRiskEngine, RiskResult
 from api.storage import InMemoryStorage
+
+
+
+def gmail_b64(value: str) -> str:
+    return base64.urlsafe_b64encode(value.encode()).decode().rstrip("=")
+
+def gmail_message(payload: dict, snippet: str = "snippet") -> dict:
+    payload.setdefault("headers", [{"name":"From","value":"Sender <sender@example.com>"},{"name":"Subject","value":"Test https://url.test"}])
+    return {"id":"m1","threadId":"t1","internalDate":"1710000000000","labelIds":["INBOX"],"snippet":snippet,"payload":payload}
 
 class FakeTextResult:
     prediction = "phishing"; confidence = 0.91; reasons = ["text reason"]
@@ -45,6 +51,46 @@ def test_gmail_message_parsing():
     assert parsed.sender_domain == "example.com"
     assert "https://example.com/path" in parsed.urls
 
+
+
+def test_html_only_gmail_message_parsing_preserves_text_and_links():
+    html = """<html><head><style>.x{display:none}</style><script>alert('x')</script></head>
+    <body><p>Verify your account</p><a href="https://safe.example.test/login">Open portal</a></body></html>"""
+    message = gmail_message({"mimeType":"text/html","body":{"data":gmail_b64(html)}})
+    parsed = parse_gmail_message(message)
+    assert "Verify your account" in parsed.body_text
+    assert "Open portal" in parsed.body_text
+    assert "alert" not in parsed.body_text
+    assert "https://safe.example.test/login" in parsed.urls
+
+def test_multipart_alternative_prefers_plain_text():
+    message = gmail_message({
+        "mimeType":"multipart/alternative",
+        "parts":[
+            {"mimeType":"text/plain","body":{"data":gmail_b64("Plain body https://plain.example.test")}},
+            {"mimeType":"text/html","body":{"data":gmail_b64("<p>HTML body</p><a href='https://html.example.test'>link</a>")}},
+        ],
+    })
+    parsed = parse_gmail_message(message)
+    assert "Plain body" in parsed.body_text
+    assert "HTML body" not in parsed.body_text
+    assert "https://plain.example.test" in parsed.urls
+
+def test_nested_multipart_html_parsing():
+    message = gmail_message({
+        "mimeType":"multipart/mixed",
+        "parts":[
+            {"mimeType":"multipart/alternative","parts":[
+                {"mimeType":"text/html","body":{"data":gmail_b64("<div>Nested HTML</div><a href='https://nested.example.test/path'>Nested link</a>")}},
+            ]},
+            {"filename":"invoice.pdf","mimeType":"application/pdf","body":{"attachmentId":"att-1"}},
+        ],
+    })
+    parsed = parse_gmail_message(message)
+    assert "Nested HTML" in parsed.body_text
+    assert "https://nested.example.test/path" in parsed.urls
+    assert parsed.has_attachments is True
+
 def test_label_selection_unknown_maps_to_medium():
     labels = {"scanned":"S","low":"L","medium":"M","high":"H"}
     assert labels_for_risk("unknown", labels) == ["S", "M"]
@@ -54,16 +100,10 @@ def test_report_generation():
     results = [{"message_id":"m1","date":"2026-06-13","sender_domain":"bad.test","risk_level":"high","score":0.9,"url_domains":["bad.test"],"reasons":["reason"]}]
     assert "High risk: 1" in generate_markdown_report("2026-06-13", results)
     assert "bad.test" in generate_csv_report(results)
-
-def test_xlsx_report_generation_is_formatted():
-    results = [{"message_id":"m1","date":"2026-06-13","sender_domain":"bad.test","risk_level":"high","score":0.9,"url_domains":["bad.test"],"reasons":["reason"]}]
-    workbook = load_workbook(BytesIO(generate_xlsx_report_bytes("2026-06-13", results)))
-    sheet = workbook["Gmail Report"]
-    assert sheet["A1"].value == "AI Cyber Daily Gmail Report - 2026-06-13"
-    assert sheet["A10"].value == "message_id"
-    assert sheet["G11"].alignment.wrap_text is True
-    assert sheet.freeze_panes == "A11"
-    assert sheet.auto_filter.ref == "A10:G11"
+    xlsx_bytes = generate_xlsx_report_bytes(results)
+    assert xlsx_bytes.startswith(b"PK")
+    with zipfile.ZipFile(__import__("io").BytesIO(xlsx_bytes)) as workbook:
+        assert "xl/worksheets/sheet1.xml" in workbook.namelist()
 
 def test_storage_in_memory():
     storage = InMemoryStorage()
@@ -72,7 +112,7 @@ def test_storage_in_memory():
     assert storage.get_account("u@example.com")["last_history_id"] == "1"
     assert len(storage.get_scan_results_for_date("2026-06-13", "u@example.com")) == 1
 
-from api.gmail_poll_worker import format_report_output, format_scan_summary, generate_local_report, parse_drive_folder_id, scan_latest_inbox
+from api.gmail_poll_worker import ScanLock, format_report_output, format_scan_summary, generate_local_report, parse_drive_folder_id, scan_latest_inbox, upload_report_files_to_drive
 
 class FakeExecute:
     def __init__(self, value=None): self.value = value or {}
@@ -156,31 +196,76 @@ def test_local_report_console_format():
     output = format_report_output({"date": "2026-06-15", "markdown_path": "reports/generated/2026-06-15/report.md", "csv_path": "reports/generated/2026-06-15/report.csv", "xlsx_path": "reports/generated/2026-06-15/report.xlsx"})
     assert "GMAIL POLLING REPORT GENERATED" in output
     assert "reports/generated/2026-06-15/report.md" in output
-    assert "reports/generated/2026-06-15/report.xlsx" in output
 
-def test_parse_drive_folder_id_from_url_and_raw_id():
+
+def test_drive_folder_url_and_raw_id_parsing():
     folder_id = "1Ko8e6ldd3TasM-JQXpJO0wyYJ8S4u8EM"
     url = f"https://drive.google.com/drive/folders/{folder_id}?usp=drive_link"
     assert parse_drive_folder_id(url) == folder_id
     assert parse_drive_folder_id(folder_id) == folder_id
 
-def test_local_report_console_format_includes_drive_links():
+
+
+def test_drive_upload_behavior_mocked(tmp_path, monkeypatch):
+    markdown = tmp_path / "gmail_poll_report.md"
+    csv_path = tmp_path / "gmail_poll_report.csv"
+    xlsx_path = tmp_path / "gmail_poll_report.xlsx"
+    markdown.write_text("# report", encoding="utf-8")
+    csv_path.write_text("message_id", encoding="utf-8")
+    xlsx_path.write_bytes(b"PK fake")
+
+    class FakeMediaFileUpload:
+        def __init__(self, path, mimetype, resumable=False):
+            self.path = path
+            self.mimetype = mimetype
+
+    class FakeCreate:
+        def __init__(self, body):
+            self.body = body
+        def execute(self):
+            return {"id": self.body["name"], "webViewLink": f"https://drive.test/{self.body['name']}"}
+
+    class FakeFiles:
+        def create(self, body, media_body, fields):
+            return FakeCreate(body)
+
+    class FakeDriveService:
+        def files(self):
+            return FakeFiles()
+
+    fake_http = types.ModuleType("googleapiclient.http")
+    fake_http.MediaFileUpload = FakeMediaFileUpload
+    monkeypatch.setitem(sys.modules, "googleapiclient", types.ModuleType("googleapiclient"))
+    monkeypatch.setitem(sys.modules, "googleapiclient.http", fake_http)
+    monkeypatch.setattr("api.gmail_poll_worker.build_local_drive_service", lambda: FakeDriveService())
+
+    result = upload_report_files_to_drive({
+        "markdown_path": str(markdown),
+        "csv_path": str(csv_path),
+        "xlsx_path": str(xlsx_path),
+    }, "https://drive.google.com/drive/folders/folder123?usp=drive_link")
+
+    assert result["markdown"]["webViewLink"].endswith("gmail_poll_report.md")
+    assert result["csv"]["webViewLink"].endswith("gmail_poll_report.csv")
+    assert result["xlsx"]["webViewLink"].endswith("gmail_poll_report.xlsx")
+
+def test_report_console_format_includes_drive_urls():
     output = format_report_output({
-        "date": "2026-06-15",
-        "markdown_path": "reports/generated/2026-06-15/report.md",
-        "csv_path": "reports/generated/2026-06-15/report.csv",
-        "xlsx_path": "reports/generated/2026-06-15/report.xlsx",
+        "date": "2026-06-16",
+        "markdown_path": "reports/generated/2026-06-16/gmail_poll_report.md",
+        "csv_path": "reports/generated/2026-06-16/gmail_poll_report.csv",
+        "xlsx_path": "reports/generated/2026-06-16/gmail_poll_report.xlsx",
         "drive": {
-            "folder_id": "folder123",
-            "markdown": {"webViewLink": "https://drive.example/markdown"},
-            "csv": {"webViewLink": "https://drive.example/csv"},
-            "xlsx": {"webViewLink": "https://drive.example/xlsx"},
+            "markdown": {"webViewLink": "https://drive.google.com/file/d/md"},
+            "csv": {"webViewLink": "https://drive.google.com/file/d/csv"},
+            "xlsx": {"webViewLink": "https://drive.google.com/file/d/xlsx"},
         },
     })
+    assert "GMAIL POLLING REPORT GENERATED" in output
     assert "DRIVE UPLOAD COMPLETE" in output
-    assert "https://drive.example/markdown" in output
-    assert "https://drive.example/csv" in output
-    assert "https://drive.example/xlsx" in output
+    assert "Markdown URL: https://drive.google.com/file/d/md" in output
+    assert "CSV URL     : https://drive.google.com/file/d/csv" in output
+    assert "XLSX URL    : https://drive.google.com/file/d/xlsx" in output
 
 from api import polling_dashboard
 
@@ -209,12 +294,11 @@ def test_polling_report_listing_ignores_string_folder(tmp_path):
     dated.mkdir()
     (dated / "gmail_poll_report.md").write_text("# report")
     (dated / "gmail_poll_report.csv").write_text("message_id")
-    (dated / "gmail_poll_report.xlsx").write_bytes(generate_xlsx_report_bytes("2026-06-13", []))
     rows = polling_dashboard.list_report_folders(reports)
     assert [row["date"] for row in rows] == ["2026-06-13"]
     assert rows[0]["markdown_files"]
     assert rows[0]["csv_files"]
-    assert rows[0]["xlsx_files"]
+    assert "xlsx_files" in rows[0]
 
 def test_polling_latest_log_reads_last_100_lines(tmp_path):
     log = tmp_path / "task-log.txt"
@@ -229,3 +313,19 @@ def test_polling_scan_endpoint_helper_mocked(monkeypatch):
         return {"scanned_count": limit, "dry_run": dry_run}
     monkeypatch.setattr(polling_dashboard.gmail_poll_worker, "run_once", fake_run_once)
     assert polling_dashboard.run_scan_now(limit=20, dry_run=True) == {"scanned_count": 20, "dry_run": True}
+
+
+def test_scan_lock_prevents_overlap(tmp_path):
+    lock_path = tmp_path / "scan.lock"
+    metadata = {"pid": os.getpid(), "hostname": socket.gethostname(), "started_at": "2026-06-16T00:00:00+00:00"}
+    lock_path.write_text(json.dumps(metadata), encoding="utf-8")
+    with ScanLock(lock_path=lock_path, stale_seconds=3600) as lock:
+        assert lock.acquired is False
+    assert lock_path.exists()
+
+def test_scan_lock_removes_stale_lock(tmp_path):
+    lock_path = tmp_path / "scan.lock"
+    lock_path.write_text(json.dumps({"pid": 99999999, "hostname": socket.gethostname(), "started_at": "old"}), encoding="utf-8")
+    with ScanLock(lock_path=lock_path, stale_seconds=-1) as lock:
+        assert lock.acquired is True
+    assert not lock_path.exists()

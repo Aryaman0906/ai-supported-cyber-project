@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64, email.utils, re
+from html.parser import HTMLParser
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
@@ -40,23 +41,95 @@ def _header(headers: list[dict[str, str]], name: str) -> str:
     return ""
 
 
-def _decode_body(data: str | None) -> str:
-    if not data: return ""
+def decode_body_data(data: str | None) -> str:
+    """Decode Gmail base64url body data safely."""
+    if not data:
+        return ""
     padded = data + "=" * (-len(data) % 4)
     return base64.urlsafe_b64decode(padded.encode()).decode("utf-8", errors="replace")
 
 
-def _walk_parts(payload: dict[str, Any]) -> tuple[list[str], bool]:
-    texts: list[str] = []; has_attachments = False
+class _HTMLBodyParser(HTMLParser):
+    """Convert HTML email bodies to readable text while preserving href URLs."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.parts: list[str] = []
+        self.hrefs: list[str] = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        tag = tag.lower()
+        if tag in {"script", "style"}:
+            self._skip_depth += 1
+            return
+        if tag in {"p", "div", "br", "tr", "li", "table", "h1", "h2", "h3", "h4"}:
+            self.parts.append(" ")
+        if tag == "a":
+            attrs_dict = {name.lower(): value for name, value in attrs if value}
+            href = attrs_dict.get("href")
+            if href and href.lower().startswith(("http://", "https://")) and href not in self.hrefs:
+                self.hrefs.append(href)
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.lower()
+        if tag in {"script", "style"} and self._skip_depth:
+            self._skip_depth -= 1
+            return
+        if tag in {"p", "div", "li", "tr", "h1", "h2", "h3", "h4"}:
+            self.parts.append(" ")
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip_depth and data:
+            self.parts.append(data)
+
+
+def _normalize_whitespace(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def html_to_text(html: str) -> str:
+    """Convert HTML to readable text and append visible href URLs for analysis."""
+    parser = _HTMLBodyParser()
+    parser.feed(html or "")
+    text = _normalize_whitespace(" ".join(parser.parts))
+    href_text = " ".join(parser.hrefs)
+    return _normalize_whitespace(f"{text} {href_text}")
+
+
+def _collect_body_parts(payload: dict[str, Any]) -> tuple[list[str], list[str], bool]:
+    plain_texts: list[str] = []
+    html_texts: list[str] = []
+    has_attachments = False
+
     if payload.get("filename") and payload.get("body", {}).get("attachmentId"):
-        has_attachments = True
-    mime = payload.get("mimeType", "")
+        return plain_texts, html_texts, True
+
+    mime = (payload.get("mimeType") or "").lower()
+    body_data = payload.get("body", {}).get("data")
     if mime == "text/plain":
-        texts.append(_decode_body(payload.get("body", {}).get("data")))
+        plain_texts.append(decode_body_data(body_data))
+    elif mime == "text/html":
+        html_texts.append(html_to_text(decode_body_data(body_data)))
+
     for part in payload.get("parts", []) or []:
-        child_texts, child_has_attachments = _walk_parts(part)
-        texts.extend(child_texts); has_attachments = has_attachments or child_has_attachments
-    return texts, has_attachments
+        child_plain, child_html, child_has_attachments = _collect_body_parts(part)
+        plain_texts.extend(child_plain)
+        html_texts.extend(child_html)
+        has_attachments = has_attachments or child_has_attachments
+
+    return plain_texts, html_texts, has_attachments
+
+
+def extract_email_text(payload: dict[str, Any]) -> tuple[str, bool]:
+    """Extract the best readable text from a Gmail MIME payload.
+
+    text/plain is preferred when available. If a message only contains text/html,
+    the HTML is converted to readable text with href URLs preserved.
+    """
+    plain_texts, html_texts, has_attachments = _collect_body_parts(payload)
+    selected = plain_texts if any(text.strip() for text in plain_texts) else html_texts
+    return "\n".join(text for text in selected if text).strip(), has_attachments
 
 
 def extract_urls(*values: str, max_urls: int = 20) -> list[str]:
@@ -79,8 +152,8 @@ def parse_gmail_message(message: dict[str, Any], max_text_chars: int = 10_000, m
     sender_domain = parsed_email.split("@")[-1].lower() if "@" in parsed_email else ""
     subject = _header(headers, "Subject")
     snippet = message.get("snippet", "")
-    body_parts, has_attachments = _walk_parts(payload)
-    body_text = "\n".join(part for part in body_parts if part).strip()[:max_text_chars]
+    body_text, has_attachments = extract_email_text(payload)
+    body_text = body_text[:max_text_chars]
     urls = extract_urls(subject, snippet, body_text, max_urls=max_urls)
     domains = sorted({urlparse(url).hostname or "" for url in urls if urlparse(url).hostname})
     return ParsedGmailMessage(

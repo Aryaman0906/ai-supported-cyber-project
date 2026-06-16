@@ -4,7 +4,6 @@ Run examples:
     python -m api.gmail_poll_worker --once --limit 5
     python -m api.gmail_poll_worker --loop --interval 300 --limit 10
     python -m api.gmail_poll_worker --report-today
-    python -m api.gmail_poll_worker --report-today --upload-drive
 
 This worker uses local OAuth files in the project root:
     credentials.json  Google OAuth desktop/web client downloaded from Cloud Console
@@ -18,10 +17,12 @@ scope set.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
+import socket
 import sys
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 import time
 from typing import Any
@@ -43,30 +44,29 @@ CREDENTIALS_PATH = PROJECT_ROOT / "credentials.json"
 TOKEN_PATH = PROJECT_ROOT / "token.json"
 LOCAL_STORAGE_PATH = PROJECT_ROOT / ".local" / "gmail_poll_storage.json"
 REPORT_ROOT = PROJECT_ROOT / "reports" / "generated"
-DEFAULT_DRIVE_REPORT_FOLDER = os.getenv(
-    "LOCAL_DRIVE_REPORT_FOLDER",
-    "https://drive.google.com/drive/folders/1Ko8e6ldd3TasM-JQXpJO0wyYJ8S4u8EM?usp=drive_link",
-)
+LOCK_PATH = PROJECT_ROOT / "runtime" / "scan.lock"
+LOCK_STALE_SECONDS = 60 * 60
 
 
 class LocalGmailSetupError(RuntimeError):
     """Raised when local Gmail OAuth files are missing or invalid."""
 
 
-def build_local_credentials(credentials_path: Path = CREDENTIALS_PATH, token_path: Path = TOKEN_PATH):
-    """Build local OAuth credentials for Gmail/Drive desktop-app usage.
-
-    The first run opens a browser for user consent and writes token.json. Later
-    runs reuse token.json and refresh it when possible.
-    """
+def load_local_credentials(credentials_path: Path = CREDENTIALS_PATH, token_path: Path = TOKEN_PATH):
+    """Load local Gmail/Drive OAuth credentials without printing secrets."""
     if not credentials_path.exists():
         raise LocalGmailSetupError(
             "credentials.json was not found in the project root. Download an OAuth client JSON file first."
         )
 
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
-    from google_auth_oauthlib.flow import InstalledAppFlow
+    try:
+        from google.auth.transport.requests import Request
+        from google.oauth2.credentials import Credentials
+        from google_auth_oauthlib.flow import InstalledAppFlow
+    except ModuleNotFoundError as error:
+        raise LocalGmailSetupError(
+            "Google OAuth libraries are not installed. Run `pip install -r requirements.txt` before using local Gmail polling."
+        ) from error
 
     credentials = None
     if token_path.exists():
@@ -84,20 +84,117 @@ def build_local_credentials(credentials_path: Path = CREDENTIALS_PATH, token_pat
 
 
 def build_local_gmail_service(credentials_path: Path = CREDENTIALS_PATH, token_path: Path = TOKEN_PATH):
-    """Build a Gmail API service using local OAuth files."""
-    from googleapiclient.discovery import build
+    """Build a Gmail API service using local OAuth files.
 
-    credentials = build_local_credentials(credentials_path, token_path)
+    The first run opens a browser for user consent and writes token.json. Later
+    runs reuse token.json and refresh it when possible.
+    """
+    try:
+        from googleapiclient.discovery import build
+    except ModuleNotFoundError as error:
+        raise LocalGmailSetupError(
+            "Google API client libraries are not installed. Run `pip install -r requirements.txt` before scanning Gmail."
+        ) from error
+
+    credentials = load_local_credentials(credentials_path, token_path)
     return build("gmail", "v1", credentials=credentials, cache_discovery=False)
 
 
 def build_local_drive_service(credentials_path: Path = CREDENTIALS_PATH, token_path: Path = TOKEN_PATH):
-    """Build a Drive API service using the same local OAuth files."""
-    from googleapiclient.discovery import build
+    """Build a Drive API service using the same local OAuth token as Gmail."""
+    try:
+        from googleapiclient.discovery import build
+    except ModuleNotFoundError as error:
+        raise LocalGmailSetupError(
+            "Google API client libraries are not installed. Run `pip install -r requirements.txt` before using --upload-drive."
+        ) from error
 
-    credentials = build_local_credentials(credentials_path, token_path)
+    credentials = load_local_credentials(credentials_path, token_path)
     return build("drive", "v3", credentials=credentials, cache_discovery=False)
 
+
+
+class ScanLock:
+    """Atomic lock-file guard for scheduled Gmail scans."""
+
+    def __init__(self, lock_path: Path = LOCK_PATH, stale_seconds: int = LOCK_STALE_SECONDS) -> None:
+        self.lock_path = lock_path
+        self.stale_seconds = stale_seconds
+        self.acquired = False
+
+    def __enter__(self) -> "ScanLock":
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        while True:
+            try:
+                fd = os.open(str(self.lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            except FileExistsError:
+                if self._is_stale_or_dead():
+                    self._remove_lock()
+                    continue
+                print("Another scan is already running. Skipping this scheduled run.")
+                self.acquired = False
+                return self
+
+            metadata = {
+                "pid": os.getpid(),
+                "hostname": socket.gethostname(),
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            }
+            with os.fdopen(fd, "w", encoding="utf-8") as lock_file:
+                json.dump(metadata, lock_file)
+            self.acquired = True
+            return self
+
+    def __exit__(self, exc_type, exc, traceback) -> None:
+        if self.acquired:
+            self._remove_lock()
+
+    def _read_metadata(self) -> dict[str, Any]:
+        try:
+            return json.loads(self.lock_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+
+    def _is_stale_or_dead(self) -> bool:
+        metadata = self._read_metadata()
+        if self._is_timed_out():
+            return True
+
+        pid = metadata.get("pid")
+        hostname = metadata.get("hostname")
+        if not isinstance(pid, int) or hostname != socket.gethostname():
+            return False
+
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return True
+        except PermissionError:
+            return False
+        except OSError:
+            return self._is_timed_out()
+        return False
+
+    def _is_timed_out(self) -> bool:
+        try:
+            age_seconds = time.time() - self.lock_path.stat().st_mtime
+        except OSError:
+            return True
+        return age_seconds > self.stale_seconds
+
+    def _remove_lock(self) -> None:
+        try:
+            self.lock_path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def run_once_with_lock(limit: int, force: bool = False, dry_run: bool = False) -> dict[str, Any] | None:
+    """Run one scheduled scan only if no other scan is active."""
+    with ScanLock() as lock:
+        if not lock.acquired:
+            return None
+        return run_once(limit=limit, force=force, dry_run=dry_run)
 
 def build_local_risk_engine() -> GmailRiskEngine:
     """Build the local risk engine, loading models if they exist.
@@ -224,6 +321,7 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+
 def _format_list(values: list[Any]) -> str:
     """Format a short list for console output without exposing raw JSON."""
     clean_values = [str(value) for value in values if value]
@@ -279,59 +377,50 @@ def format_scan_summary(summary: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def parse_drive_folder_id(folder: str | None) -> str:
-    """Accept either a raw Drive folder ID or a Google Drive folder URL."""
-    value = (folder or "").strip()
-    if not value:
-        raise LocalGmailSetupError("A Drive folder URL or folder ID is required for --upload-drive.")
 
-    for pattern in (r"/folders/([A-Za-z0-9_-]+)", r"[?&]id=([A-Za-z0-9_-]+)"):
-        match = re.search(pattern, value)
-        if match:
-            return match.group(1)
+def parse_drive_folder_id(folder: str) -> str:
+    """Extract a Drive folder ID from a folder URL or return a raw folder ID.
 
-    if "drive.google.com" in value:
-        raise LocalGmailSetupError(f"Could not extract a Drive folder ID from: {value}")
-
-    return value
+    Supported URL example:
+    https://drive.google.com/drive/folders/<FOLDER_ID>?usp=drive_link
+    """
+    folder = folder.strip()
+    if not folder:
+        raise ValueError("Drive folder URL or ID is required when --upload-drive is used.")
+    match = re.search(r"/folders/([^/?#]+)", folder)
+    return match.group(1) if match else folder
 
 
-def upload_file_to_drive(service: Any, file_path: Path, folder_id: str, mime_type: str) -> dict[str, str | None]:
-    """Upload one local report file into an existing Google Drive folder."""
-    if not file_path.exists():
-        raise LocalGmailSetupError(f"Report file not found: {file_path}")
+def upload_report_files_to_drive(report: dict[str, str], drive_folder: str) -> dict[str, dict[str, str | None]]:
+    """Upload local Markdown, CSV, and XLSX report files to a specific Drive folder."""
+    try:
+        from googleapiclient.http import MediaFileUpload
+    except ModuleNotFoundError as error:
+        raise LocalGmailSetupError(
+            "Google API client libraries are not installed. Run `pip install -r requirements.txt` before using --upload-drive."
+        ) from error
 
-    from googleapiclient.http import MediaFileUpload
+    try:
+        folder_id = parse_drive_folder_id(drive_folder)
+    except ValueError as error:
+        raise LocalGmailSetupError(str(error)) from error
+    service = build_local_drive_service()
 
-    media = MediaFileUpload(str(file_path), mimetype=mime_type, resumable=False)
-    uploaded = service.files().create(
-        body={"name": file_path.name, "parents": [folder_id]},
-        media_body=media,
-        fields="id,name,webViewLink",
-    ).execute()
-    return {"id": uploaded.get("id"), "name": uploaded.get("name"), "webViewLink": uploaded.get("webViewLink")}
+    def upload(path_key: str, mime_type: str) -> dict[str, str | None]:
+        path = Path(report[path_key])
+        media = MediaFileUpload(str(path), mimetype=mime_type, resumable=False)
+        uploaded = service.files().create(
+            body={"name": path.name, "parents": [folder_id]},
+            media_body=media,
+            fields="id,webViewLink",
+        ).execute()
+        return {"id": uploaded.get("id"), "webViewLink": uploaded.get("webViewLink")}
 
-
-def upload_report_to_drive(report: dict[str, Any], folder: str | None = None) -> dict[str, Any]:
-    """Upload the generated Markdown, CSV, and XLSX reports to the configured Drive folder."""
-    folder_id = parse_drive_folder_id(folder or DEFAULT_DRIVE_REPORT_FOLDER)
-    drive_service = build_local_drive_service()
-    markdown_path = Path(report["markdown_path"])
-    csv_path = Path(report["csv_path"])
-    xlsx_path = Path(report["xlsx_path"])
-    report["drive"] = {
-        "folder_id": folder_id,
-        "markdown": upload_file_to_drive(drive_service, markdown_path, folder_id, "text/markdown"),
-        "csv": upload_file_to_drive(drive_service, csv_path, folder_id, "text/csv"),
-        "xlsx": upload_file_to_drive(
-            drive_service,
-            xlsx_path,
-            folder_id,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        ),
+    return {
+        "markdown": upload("markdown_path", "text/markdown"),
+        "csv": upload("csv_path", "text/csv"),
+        "xlsx": upload("xlsx_path", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
     }
-    return report
-
 
 def format_report_output(report: dict[str, Any]) -> str:
     """Return clean console output for local report generation and Drive upload."""
@@ -343,7 +432,6 @@ def format_report_output(report: dict[str, Any]) -> str:
         f"CSV         : {report.get('csv_path', 'not generated')}",
         f"XLSX        : {report.get('xlsx_path', 'not generated')}",
     ]
-
     drive = report.get("drive") or {}
     if drive:
         lines.extend(
@@ -351,18 +439,15 @@ def format_report_output(report: dict[str, Any]) -> str:
                 "",
                 "DRIVE UPLOAD COMPLETE",
                 "=====================",
-                f"Folder ID   : {drive.get('folder_id', 'unknown')}",
                 f"Markdown URL: {(drive.get('markdown') or {}).get('webViewLink', 'not returned')}",
                 f"CSV URL     : {(drive.get('csv') or {}).get('webViewLink', 'not returned')}",
                 f"XLSX URL    : {(drive.get('xlsx') or {}).get('webViewLink', 'not returned')}",
             ]
         )
-
     return "\n".join(lines)
 
-
 def generate_local_report(storage: LocalJsonStorage, report_date: str | None = None) -> dict[str, str]:
-    """Generate Markdown, CSV, and formatted XLSX reports under reports/generated/YYYY-MM-DD/."""
+    """Generate Markdown, CSV, and XLSX reports under reports/generated/YYYY-MM-DD/."""
     report_date = report_date or date.today().isoformat()
     results = storage.get_scan_results_for_date(report_date, email="local-gmail")
     output_dir = REPORT_ROOT / report_date
@@ -372,7 +457,7 @@ def generate_local_report(storage: LocalJsonStorage, report_date: str | None = N
     xlsx_path = output_dir / "gmail_poll_report.xlsx"
     markdown_path.write_text(generate_markdown_report(report_date, results), encoding="utf-8")
     csv_path.write_text(generate_csv_report(results), encoding="utf-8")
-    xlsx_path.write_bytes(generate_xlsx_report_bytes(report_date, results))
+    xlsx_path.write_bytes(generate_xlsx_report_bytes(results))
     return {"date": report_date, "markdown_path": str(markdown_path), "csv_path": str(csv_path), "xlsx_path": str(xlsx_path)}
 
 
@@ -387,8 +472,9 @@ def run_once(limit: int, force: bool = False, dry_run: bool = False) -> dict[str
 def run_loop(interval: int, limit: int, force: bool = False, dry_run: bool = False) -> None:
     """Run local Gmail polling forever until interrupted."""
     while True:
-        summary = run_once(limit=limit, force=force, dry_run=dry_run)
-        print(format_scan_summary(summary), flush=True)
+        summary = run_once_with_lock(limit=limit, force=force, dry_run=dry_run)
+        if summary is not None:
+            print(format_scan_summary(summary), flush=True)
         time.sleep(interval)
 
 
@@ -403,23 +489,20 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=10, help="Latest inbox message count to scan, max 100.")
     parser.add_argument("--force", action="store_true", help="Re-scan messages already labeled AI-Cyber/Scanned.")
     parser.add_argument("--dry-run", action="store_true", help="Analyze and store metadata without applying Gmail labels.")
-    parser.add_argument("--upload-drive", action="store_true", help="After --report-today, upload the Markdown/CSV/XLSX report to Google Drive.")
-    parser.add_argument(
-        "--drive-folder",
-        default=DEFAULT_DRIVE_REPORT_FOLDER,
-        help="Drive folder URL or folder ID for --upload-drive. Defaults to LOCAL_DRIVE_REPORT_FOLDER.",
-    )
+    parser.add_argument("--upload-drive", action="store_true", help="Upload today's Markdown/CSV/XLSX report to Google Drive.")
+    parser.add_argument("--drive-folder", default="", help="Google Drive folder URL or raw folder ID for --upload-drive.")
     args = parser.parse_args()
 
     try:
         if args.report_today:
             report = generate_local_report(LocalJsonStorage(LOCAL_STORAGE_PATH))
             if args.upload_drive:
-                report = upload_report_to_drive(report, args.drive_folder)
+                report["drive"] = upload_report_files_to_drive(report, args.drive_folder)
             print(format_report_output(report))
         elif args.once:
-            summary = run_once(limit=args.limit, force=args.force, dry_run=args.dry_run)
-            print(format_scan_summary(summary))
+            summary = run_once_with_lock(limit=args.limit, force=args.force, dry_run=args.dry_run)
+            if summary is not None:
+                print(format_scan_summary(summary))
         elif args.loop:
             run_loop(interval=args.interval, limit=args.limit, force=args.force, dry_run=args.dry_run)
     except LocalGmailSetupError as error:

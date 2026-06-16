@@ -1,101 +1,21 @@
 text,label
-Team reminder: the security awareness session starts at 3 PM in room 204.,legitimate
-Your package delivery window is tomorrow between 10 AM and 12 PM.,legitimate
-Please review the attached meeting agenda before Friday's project check-in.,legitimate
-Campus library notice: your borrowed book is due next week.,legitimate
-IT maintenance notice: email service may be unavailable for 15 minutes tonight.,legitimate
-Your monthly bank statement is ready in the official mobile app.,legitimate
-Professor Rao shared updated lecture notes on the course portal.,legitimate
-HR reminder: submit your timesheet through the internal employee portal.,legitimate
-Reminder: the coding club workshop registration closes tomorrow.,legitimate
-Your electricity bill has been generated and can be viewed on the official provider site.,legitimate
-Your lab report feedback has been uploaded to the student portal.,legitimate
-Weekly newsletter: new articles about cloud security and safe password habits.,legitimate
-Calendar invite accepted for the project demo review on Monday.,legitimate
-Your order receipt is available in your account purchase history.,legitimate
-Course portal notification: assignment 4 has been graded.,legitimate
-Office notice: the network printer will be serviced after 6 PM.,legitimate
-Bank alert: your card ending 1234 was used at a grocery store; contact support through the official app if this was not you.,legitimate
-Your password was changed successfully from the settings page you opened earlier.,legitimate
-Reminder from finance: reimbursement claims must be submitted through the company portal.,legitimate
-New comment added to the shared design document.,legitimate
-Your cloud backup completed successfully with no action required.,legitimate
-Meeting room booking confirmed for Wednesday at 11 AM.,legitimate
-Library account update: your reserved book is now available at the front desk.,legitimate
-University exam schedule has been published on the official portal.,legitimate
-Support ticket update: your issue has been assigned to a technician.,legitimate
-Software update notice: restart your computer after working hours.,legitimate
-Your subscription invoice is available for download after signing in normally.,legitimate
-Training reminder: complete the phishing awareness quiz by Friday.,legitimate
-Delivery update: your parcel reached the local sorting center.,legitimate
-Your leave request was approved by your manager.,legitimate
-Security tip: do not share OTPs or recovery codes with anyone.,legitimate
-Club announcement: volunteers are needed for the weekend tech event.,legitimate
-Receipt from cafeteria payment has been added to your account history.,legitimate
-Project board update: two tasks moved to review.,legitimate
-Official notice: campus Wi-Fi maintenance is scheduled for Sunday morning.,legitimate
-Your profile picture was updated on the internal portal.,legitimate
-Reminder: submit feedback for the guest lecture through the official form.,legitimate
-Your certificate for the completed workshop is ready in the learning portal.,legitimate
-Account notice: review recent sign-ins from the official security dashboard.,legitimate
-Your appointment with the academic advisor is confirmed for 2 PM tomorrow.,legitimate
-Payroll notice: payslip is available in the employee self-service portal.,legitimate
-Cloud storage summary: you used 52 percent of your available space this month.,legitimate
-Repository notification: a teammate requested review on your pull request.,legitimate
-Your exam admit card is available through the college portal.,legitimate
-Reminder: bring your ID card for tomorrow's lab evaluation.,legitimate
-Official transport update: shuttle timing changed due to road maintenance.,legitimate
-Community update: the cyber safety webinar recording is now available.,legitimate
-Your warranty registration was completed successfully.,legitimate
-Support reminder: never send passwords over email or chat.,legitimate
-Your account recovery options were reviewed with no changes made.,legitimate
-Your account will be closed today unless you verify your password immediately at a suspicious link.,phishing
-Urgent action required: confirm your login details to avoid permanent suspension.,phishing
+"Team reminder: the security awareness session starts at 3 PM in room 204.",legitimate
+"Your package delivery window is tomorrow between 10 AM and 12 PM.",legitimate
+"Please review the attached meeting agenda before Friday's project check-in.",legitimate
+"Campus library notice: your borrowed book is due next week.",legitimate
+"IT maintenance notice: email service may be unavailable for 15 minutes tonight.",legitimate
+"Your monthly bank statement is ready in the official mobile app.",legitimate
+"Professor Rao shared updated lecture notes on the course portal.",legitimate
+"HR reminder: submit your timesheet through the internal employee portal.",legitimate
+"Your account will be closed today unless you verify your password immediately at a suspicious link.",phishing
+"Urgent action required: confirm your login details to avoid permanent suspension.",phishing
 "Security alert: unusual activity detected, enter your username and password on this external page.",phishing
 "Congratulations, you won a prize; pay a small processing fee to claim it now.",phishing
-Mailbox storage full: click the unknown link and re-enter your credentials.,phishing
+"Mailbox storage full: click the unknown link and re-enter your credentials.",phishing
 "Final warning: your payment failed, update card details through this unfamiliar website.",phishing
-Account validation required within one hour or access will be removed.,phishing
-Important notice: download the attached form and provide your confidential recovery codes.,phishing
-Urgent refund approved: provide banking details through this shortened link.,phishing
-Your cloud account is locked; verify identity by sharing your one-time passcode.,phishing
-Immediate verification required: send your password to keep email service active.,phishing
-Your salary payment is on hold; open this attachment and enter bank information.,phishing
-Your device is infected; call the fake support number and share remote access.,phishing
-Winner notice: claim a free phone by paying delivery charges today.,phishing
-Your student portal is disabled; update login details through the link below.,phishing
-Unusual sign-in blocked: approve access by entering your OTP on this page.,phishing
-Tax refund pending: confirm card number and security code to receive payment.,phishing
-Your invoice is overdue; download the executable attachment to view details.,phishing
-Email quota exceeded: migrate your mailbox by typing your password again.,phishing
-Banking alert: reactivate your account using this non-official verification portal.,phishing
-Your account has been selected for a bonus; submit ID and bank details now.,phishing
-Password reset request: ignore the official app and use this temporary link.,phishing
-Cloud document shared: enable macros to view the protected salary sheet.,phishing
-"Final notice from admin: reply with your username, password, and OTP.",phishing
-Payment confirmation failed: update card PIN through the attached link.,phishing
-Delivery failed: pay customs fee through this shortened unknown URL.,phishing
-University grant approved: send your login password to process funds.,phishing
-Security team request: share recovery codes to complete account audit.,phishing
-Suspicious login detected: verify through a domain that is not the official site.,phishing
-Limited time offer: enter corporate credentials to unlock a gift card.,phishing
-Your email will be deleted unless you confirm access through this external form.,phishing
-System upgrade: all users must send password and backup code before midnight.,phishing
-Account suspension warning: click the masked link and enter private details.,phishing
-Crypto reward available: deposit a small amount to unlock your prize.,phishing
-HR payroll correction: provide debit card number and OTP for verification.,phishing
-Document expired: install the unknown viewer attached to this email.,phishing
-Urgent legal notice: open the attachment and enable editing to read the case file.,phishing
-Your subscription is cancelled; restore service by confirming full card details.,phishing
-VPN access disabled: login through this unfamiliar page to reactivate it.,phishing
-Support desk alert: remote technician needs your screen sharing code now.,phishing
-Your professor shared grades; login through the shortened external URL to see them.,phishing
-Refund failed: provide account number and internet banking password.,phishing
-Security update pending: download this patch from an unverified file host.,phishing
-Immediate mailbox cleanup: authenticate with your password using the link provided.,phishing
-"Prize draw selected you: submit Aadhaar, card details, and OTP to claim.",phishing
-IT helpdesk warning: scan QR code and approve the unexpected login request.,phishing
-Payroll bonus release: confirm employee ID and bank PIN on this portal.,phishing
-Account breach alert: verify by sending your password in reply to this email.,phishing
-Blocked transaction alert: install the attached security certificate.,phishing
-Final reminder: validate cloud account through a lookalike domain today.,phishing
+"Account validation required within one hour or access will be removed.",phishing
+"Important notice: download the attached form and provide your confidential recovery codes.",phishing
+"Reminder: the coding club workshop registration closes tomorrow.",legitimate
+"Your electricity bill has been generated and can be viewed on the official provider site.",legitimate
+"Urgent refund approved: provide banking details through this shortened link.",phishing
+"Your cloud account is locked; verify identity by sharing your one-time passcode.",phishing
