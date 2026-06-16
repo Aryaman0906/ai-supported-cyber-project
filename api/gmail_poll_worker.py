@@ -4,6 +4,7 @@ Run examples:
     python -m api.gmail_poll_worker --once --limit 5
     python -m api.gmail_poll_worker --loop --interval 300 --limit 10
     python -m api.gmail_poll_worker --report-today
+    python -m api.gmail_poll_worker --report-today --upload-drive
 
 This worker uses local OAuth files in the project root:
     credentials.json  Google OAuth desktop/web client downloaded from Cloud Console
@@ -17,6 +18,8 @@ scope set.
 from __future__ import annotations
 
 import argparse
+import os
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -40,14 +43,18 @@ CREDENTIALS_PATH = PROJECT_ROOT / "credentials.json"
 TOKEN_PATH = PROJECT_ROOT / "token.json"
 LOCAL_STORAGE_PATH = PROJECT_ROOT / ".local" / "gmail_poll_storage.json"
 REPORT_ROOT = PROJECT_ROOT / "reports" / "generated"
+DEFAULT_DRIVE_REPORT_FOLDER = os.getenv(
+    "LOCAL_DRIVE_REPORT_FOLDER",
+    "https://drive.google.com/drive/folders/1Ko8e6ldd3TasM-JQXpJO0wyYJ8S4u8EM?usp=drive_link",
+)
 
 
 class LocalGmailSetupError(RuntimeError):
     """Raised when local Gmail OAuth files are missing or invalid."""
 
 
-def build_local_gmail_service(credentials_path: Path = CREDENTIALS_PATH, token_path: Path = TOKEN_PATH):
-    """Build a Gmail API service using local OAuth files.
+def build_local_credentials(credentials_path: Path = CREDENTIALS_PATH, token_path: Path = TOKEN_PATH):
+    """Build local OAuth credentials for Gmail/Drive desktop-app usage.
 
     The first run opens a browser for user consent and writes token.json. Later
     runs reuse token.json and refresh it when possible.
@@ -60,7 +67,6 @@ def build_local_gmail_service(credentials_path: Path = CREDENTIALS_PATH, token_p
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
-    from googleapiclient.discovery import build
 
     credentials = None
     if token_path.exists():
@@ -74,7 +80,23 @@ def build_local_gmail_service(credentials_path: Path = CREDENTIALS_PATH, token_p
             credentials = flow.run_local_server(port=0)
         token_path.write_text(credentials.to_json(), encoding="utf-8")
 
+    return credentials
+
+
+def build_local_gmail_service(credentials_path: Path = CREDENTIALS_PATH, token_path: Path = TOKEN_PATH):
+    """Build a Gmail API service using local OAuth files."""
+    from googleapiclient.discovery import build
+
+    credentials = build_local_credentials(credentials_path, token_path)
     return build("gmail", "v1", credentials=credentials, cache_discovery=False)
+
+
+def build_local_drive_service(credentials_path: Path = CREDENTIALS_PATH, token_path: Path = TOKEN_PATH):
+    """Build a Drive API service using the same local OAuth files."""
+    from googleapiclient.discovery import build
+
+    credentials = build_local_credentials(credentials_path, token_path)
+    return build("drive", "v3", credentials=credentials, cache_discovery=False)
 
 
 def build_local_risk_engine() -> GmailRiskEngine:
@@ -202,7 +224,6 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-
 def _format_list(values: list[Any]) -> str:
     """Format a short list for console output without exposing raw JSON."""
     clean_values = [str(value) for value in values if value]
@@ -258,17 +279,78 @@ def format_scan_summary(summary: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def format_report_output(report: dict[str, str]) -> str:
-    """Return clean console output for local report generation."""
-    return "\n".join(
-        [
-            "GMAIL POLLING REPORT GENERATED",
-            "==============================",
-            f"Report date : {report.get('date', 'unknown')}",
-            f"Markdown    : {report.get('markdown_path', 'not generated')}",
-            f"CSV         : {report.get('csv_path', 'not generated')}",
-        ]
-    )
+def parse_drive_folder_id(folder: str | None) -> str:
+    """Accept either a raw Drive folder ID or a Google Drive folder URL."""
+    value = (folder or "").strip()
+    if not value:
+        raise LocalGmailSetupError("A Drive folder URL or folder ID is required for --upload-drive.")
+
+    for pattern in (r"/folders/([A-Za-z0-9_-]+)", r"[?&]id=([A-Za-z0-9_-]+)"):
+        match = re.search(pattern, value)
+        if match:
+            return match.group(1)
+
+    if "drive.google.com" in value:
+        raise LocalGmailSetupError(f"Could not extract a Drive folder ID from: {value}")
+
+    return value
+
+
+def upload_file_to_drive(service: Any, file_path: Path, folder_id: str, mime_type: str) -> dict[str, str | None]:
+    """Upload one local report file into an existing Google Drive folder."""
+    if not file_path.exists():
+        raise LocalGmailSetupError(f"Report file not found: {file_path}")
+
+    from googleapiclient.http import MediaFileUpload
+
+    media = MediaFileUpload(str(file_path), mimetype=mime_type, resumable=False)
+    uploaded = service.files().create(
+        body={"name": file_path.name, "parents": [folder_id]},
+        media_body=media,
+        fields="id,name,webViewLink",
+    ).execute()
+    return {"id": uploaded.get("id"), "name": uploaded.get("name"), "webViewLink": uploaded.get("webViewLink")}
+
+
+def upload_report_to_drive(report: dict[str, Any], folder: str | None = None) -> dict[str, Any]:
+    """Upload the generated Markdown and CSV reports to the configured Drive folder."""
+    folder_id = parse_drive_folder_id(folder or DEFAULT_DRIVE_REPORT_FOLDER)
+    drive_service = build_local_drive_service()
+    markdown_path = Path(report["markdown_path"])
+    csv_path = Path(report["csv_path"])
+    report["drive"] = {
+        "folder_id": folder_id,
+        "markdown": upload_file_to_drive(drive_service, markdown_path, folder_id, "text/markdown"),
+        "csv": upload_file_to_drive(drive_service, csv_path, folder_id, "text/csv"),
+    }
+    return report
+
+
+def format_report_output(report: dict[str, Any]) -> str:
+    """Return clean console output for local report generation and Drive upload."""
+    lines = [
+        "GMAIL POLLING REPORT GENERATED",
+        "==============================",
+        f"Report date : {report.get('date', 'unknown')}",
+        f"Markdown    : {report.get('markdown_path', 'not generated')}",
+        f"CSV         : {report.get('csv_path', 'not generated')}",
+    ]
+
+    drive = report.get("drive") or {}
+    if drive:
+        lines.extend(
+            [
+                "",
+                "DRIVE UPLOAD COMPLETE",
+                "=====================",
+                f"Folder ID   : {drive.get('folder_id', 'unknown')}",
+                f"Markdown URL: {(drive.get('markdown') or {}).get('webViewLink', 'not returned')}",
+                f"CSV URL     : {(drive.get('csv') or {}).get('webViewLink', 'not returned')}",
+            ]
+        )
+
+    return "\n".join(lines)
+
 
 def generate_local_report(storage: LocalJsonStorage, report_date: str | None = None) -> dict[str, str]:
     """Generate Markdown and CSV reports under reports/generated/YYYY-MM-DD/."""
@@ -310,11 +392,19 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=10, help="Latest inbox message count to scan, max 100.")
     parser.add_argument("--force", action="store_true", help="Re-scan messages already labeled AI-Cyber/Scanned.")
     parser.add_argument("--dry-run", action="store_true", help="Analyze and store metadata without applying Gmail labels.")
+    parser.add_argument("--upload-drive", action="store_true", help="After --report-today, upload the Markdown/CSV report to Google Drive.")
+    parser.add_argument(
+        "--drive-folder",
+        default=DEFAULT_DRIVE_REPORT_FOLDER,
+        help="Drive folder URL or folder ID for --upload-drive. Defaults to LOCAL_DRIVE_REPORT_FOLDER.",
+    )
     args = parser.parse_args()
 
     try:
         if args.report_today:
             report = generate_local_report(LocalJsonStorage(LOCAL_STORAGE_PATH))
+            if args.upload_drive:
+                report = upload_report_to_drive(report, args.drive_folder)
             print(format_report_output(report))
         elif args.once:
             summary = run_once(limit=args.limit, force=args.force, dry_run=args.dry_run)
