@@ -3,6 +3,7 @@ setlocal
 
 REM Local no-billing Gmail polling task runner.
 REM This file writes only clean scan/report summaries and never prints secrets.
+REM The report step now generates Markdown, CSV, and formatted XLSX files.
 cd /d "%~dp0"
 
 set "DRIVE_REPORT_FOLDER=https://drive.google.com/drive/folders/1Ko8e6ldd3TasM-JQXpJO0wyYJ8S4u8EM?usp=drive_link"
