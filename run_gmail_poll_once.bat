@@ -1,16 +1,28 @@
 @echo off
-cd /d D:\cyberproject\ai-supported-cyber-project
+setlocal
 
-if not exist reports\generated mkdir reports\generated
+REM Local no-billing Gmail polling task runner.
+REM This file writes only clean scan/report summaries and never prints secrets.
+cd /d "%~dp0"
 
-echo =============================== > reports\generated\task-log.txt
-echo Task started >> reports\generated\task-log.txt
-echo Current directory: %cd% >> reports\generated\task-log.txt
-echo. >> reports\generated\task-log.txt
+if not exist "reports\generated" mkdir "reports\generated"
 
-D:\cyberproject\ai-supported-cyber-project\.venv\Scripts\python.exe -m api.gmail_poll_worker --once --limit 20 >> reports\generated\task-log.txt 2>&1
+echo ================================================== >> "reports\generated\task-log.txt"
+echo Gmail polling task started: %DATE% %TIME% >> "reports\generated\task-log.txt"
+echo. >> "reports\generated\task-log.txt"
 
-echo. >> reports\generated\task-log.txt
-echo Exit code: %ERRORLEVEL% >> reports\generated\task-log.txt
-echo Task finished >> reports\generated\task-log.txt
-echo =============================== >> reports\generated\task-log.txt
+python -m api.gmail_poll_worker --once --limit 20 >> "reports\generated\task-log.txt" 2>&1
+set SCAN_EXIT_CODE=%ERRORLEVEL%
+
+echo. >> "reports\generated\task-log.txt"
+python -m api.gmail_poll_worker --report-today >> "reports\generated\task-log.txt" 2>&1
+set REPORT_EXIT_CODE=%ERRORLEVEL%
+
+echo. >> "reports\generated\task-log.txt"
+echo Scan exit code: %SCAN_EXIT_CODE% >> "reports\generated\task-log.txt"
+echo Report exit code: %REPORT_EXIT_CODE% >> "reports\generated\task-log.txt"
+echo Gmail polling task finished: %DATE% %TIME% >> "reports\generated\task-log.txt"
+echo ================================================== >> "reports\generated\task-log.txt"
+
+if not "%SCAN_EXIT_CODE%"=="0" exit /b %SCAN_EXIT_CODE%
+exit /b %REPORT_EXIT_CODE%

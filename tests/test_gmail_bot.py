@@ -59,7 +59,7 @@ def test_storage_in_memory():
     assert storage.get_account("u@example.com")["last_history_id"] == "1"
     assert len(storage.get_scan_results_for_date("2026-06-13", "u@example.com")) == 1
 
-from api.gmail_poll_worker import generate_local_report, scan_latest_inbox
+from api.gmail_poll_worker import format_report_output, format_scan_summary, generate_local_report, scan_latest_inbox
 
 class FakeExecute:
     def __init__(self, value=None): self.value = value or {}
@@ -108,6 +108,40 @@ def test_local_report_generation(tmp_path, monkeypatch):
     output = generate_local_report(storage, "2026-06-13")
     assert Path(output["markdown_path"]).exists()
     assert Path(output["csv_path"]).exists()
+
+def test_local_polling_console_format_hides_skipped_ids():
+    summary = {
+        "scanned_count": 1,
+        "skipped_count": 1,
+        "high_count": 1,
+        "medium_count": 0,
+        "low_count": 0,
+        "unknown_count": 0,
+        "results": [
+            {
+                "message_id": "new-message",
+                "sender": "Demo <demo@example.test>",
+                "subject_preview": "Hackathon demo",
+                "risk_level": "high",
+                "score": 0.91,
+                "url_domains": ["example.test"],
+                "labels_applied": ["AI-Cyber/Scanned", "AI-Cyber/High"],
+                "reasons": ["Mock reason"],
+            },
+            {"message_id": "skipped-message-id", "skipped": True, "reason": "Already labeled"},
+        ],
+    }
+    output = format_scan_summary(summary)
+    assert "GMAIL POLLING TASK RESULT" in output
+    assert "Scanned emails : 1" in output
+    assert "Skipped emails : 1" in output
+    assert "skipped-message-id" not in output
+    assert "Mock reason" in output
+
+def test_local_report_console_format():
+    output = format_report_output({"date": "2026-06-15", "markdown_path": "reports/generated/2026-06-15/report.md", "csv_path": "reports/generated/2026-06-15/report.csv"})
+    assert "GMAIL POLLING REPORT GENERATED" in output
+    assert "reports/generated/2026-06-15/report.md" in output
 
 from api import polling_dashboard
 

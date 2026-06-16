@@ -202,6 +202,74 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+
+def _format_list(values: list[Any]) -> str:
+    """Format a short list for console output without exposing raw JSON."""
+    clean_values = [str(value) for value in values if value]
+    return ", ".join(clean_values) if clean_values else "none"
+
+
+def format_scan_summary(summary: dict[str, Any]) -> str:
+    """Return a human-readable local polling summary for task-log.txt.
+
+    The returned text intentionally avoids full email bodies, OAuth tokens, and
+    credentials. Skipped messages are summarized by count only so scheduled logs
+    stay compact and presentation-friendly.
+    """
+    lines = [
+        "GMAIL POLLING TASK RESULT",
+        "=========================",
+        f"Scanned emails : {summary.get('scanned_count', 0)}",
+        f"Skipped emails : {summary.get('skipped_count', 0)}",
+        f"High risk      : {summary.get('high_count', 0)}",
+        f"Medium risk    : {summary.get('medium_count', 0)}",
+        f"Low risk       : {summary.get('low_count', 0)}",
+        f"Unknown risk   : {summary.get('unknown_count', 0)}",
+    ]
+
+    analyzed_results = [result for result in summary.get("results", []) if not result.get("skipped")]
+    if not analyzed_results:
+        lines.extend(["", "No newly analyzed emails in this run."])
+        return "\n".join(lines)
+
+    lines.extend(["", "Newly analyzed emails:"])
+    for index, result in enumerate(analyzed_results, start=1):
+        reasons = result.get("reasons") or []
+        labels = result.get("labels_applied") or []
+        url_domains = result.get("url_domains") or []
+        lines.extend(
+            [
+                "",
+                f"Email {index}",
+                "-------",
+                f"Sender        : {result.get('sender') or 'unknown'}",
+                f"Subject       : {result.get('subject_preview') or '(no subject)'}",
+                f"Risk level    : {result.get('risk_level') or 'unknown'}",
+                f"Score         : {result.get('score', 'n/a')}",
+                f"URL domains   : {_format_list(url_domains)}",
+                f"Labels applied: {_format_list(labels)}",
+                "Reasons       :",
+            ]
+        )
+        if reasons:
+            lines.extend(f"  - {reason}" for reason in reasons)
+        else:
+            lines.append("  - No reasons returned.")
+    return "\n".join(lines)
+
+
+def format_report_output(report: dict[str, str]) -> str:
+    """Return clean console output for local report generation."""
+    return "\n".join(
+        [
+            "GMAIL POLLING REPORT GENERATED",
+            "==============================",
+            f"Report date : {report.get('date', 'unknown')}",
+            f"Markdown    : {report.get('markdown_path', 'not generated')}",
+            f"CSV         : {report.get('csv_path', 'not generated')}",
+        ]
+    )
+
 def generate_local_report(storage: LocalJsonStorage, report_date: str | None = None) -> dict[str, str]:
     """Generate Markdown and CSV reports under reports/generated/YYYY-MM-DD/."""
     report_date = report_date or date.today().isoformat()
@@ -227,7 +295,7 @@ def run_loop(interval: int, limit: int, force: bool = False, dry_run: bool = Fal
     """Run local Gmail polling forever until interrupted."""
     while True:
         summary = run_once(limit=limit, force=force, dry_run=dry_run)
-        print(summary)
+        print(format_scan_summary(summary), flush=True)
         time.sleep(interval)
 
 
@@ -246,9 +314,11 @@ def main() -> None:
 
     try:
         if args.report_today:
-            print(generate_local_report(LocalJsonStorage(LOCAL_STORAGE_PATH)))
+            report = generate_local_report(LocalJsonStorage(LOCAL_STORAGE_PATH))
+            print(format_report_output(report))
         elif args.once:
-            print(run_once(limit=args.limit, force=args.force, dry_run=args.dry_run))
+            summary = run_once(limit=args.limit, force=args.force, dry_run=args.dry_run)
+            print(format_scan_summary(summary))
         elif args.loop:
             run_loop(interval=args.interval, limit=args.limit, force=args.force, dry_run=args.dry_run)
     except LocalGmailSetupError as error:

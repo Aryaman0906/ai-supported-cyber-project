@@ -1,2 +1,7 @@
 Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run """D:\cyberproject\ai-supported-cyber-project\run_gmail_poll_once.bat""", 0, True
+
+ProjectDir = "D:\cyberproject\ai-supported-cyber-project"
+BatFile = ProjectDir & "\run_gmail_poll_once.bat"
+
+WshShell.CurrentDirectory = ProjectDir
+WshShell.Run """" & BatFile & """", 0, False
