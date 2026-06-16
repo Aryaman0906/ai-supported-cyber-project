@@ -4,6 +4,21 @@ Real-time phishing analysis and log triage project for defensive cybersecurity l
 
 > **Responsible-use scope:** This project is defensive only. It is designed for sanitized datasets, sample emails, test URLs, sample logs, and user-provided input. It must not be used to generate phishing content, steal credentials, attack websites, scrape real inboxes without permission, or perform harmful activity.
 
+## Current Gmail demo architecture
+
+The final Gmail demo uses **near-real-time local polling** with Windows Task Scheduler, not full real-time Gmail push monitoring and not a full cloud-native Cloud Run/Pub/Sub deployment. The working local flow is:
+
+```text
+Local Task Scheduler
+→ run_gmail_poll_hidden.vbs
+→ run_gmail_poll_once.bat
+→ Gmail scan/report worker
+→ CSV, Markdown, and XLSX reports
+→ Google Drive upload
+```
+
+Cloud Run/Pub/Sub materials remain optional future scope for students who want to explore cloud deployment later.
+
 ## Phase 1: Setup
 
 ### Goal

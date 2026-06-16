@@ -13,7 +13,7 @@ Local terminal command
 → run local text/URL risk engine when models are available
 → apply AI-Cyber labels in Gmail
 → save privacy-aware scan metadata locally
-→ generate Markdown/CSV daily reports under reports/generated/YYYY-MM-DD/
+→ generate Markdown/CSV/XLSX daily reports under reports/generated/YYYY-MM-DD/
 → optionally upload both report files to a selected Google Drive folder
 ```
 
@@ -106,6 +106,7 @@ Reports are written to:
 ```text
 reports/generated/YYYY-MM-DD/gmail_poll_report.md
 reports/generated/YYYY-MM-DD/gmail_poll_report.csv
+reports/generated/YYYY-MM-DD/gmail_poll_report.xlsx
 ```
 
 ### 8. Generate and upload today's report to Google Drive
@@ -123,6 +124,7 @@ GMAIL POLLING REPORT GENERATED
 DRIVE UPLOAD COMPLETE
 Markdown URL: ...
 CSV URL     : ...
+XLSX URL    : ...
 ```
 
 ## Optional dry run
@@ -235,7 +237,7 @@ The dashboard never displays the contents of `credentials.json` or `token.json`.
 
 ## Verifying Windows Task Scheduler
 
-If you automate polling with Windows Task Scheduler, keep using the existing `run_gmail_poll_hidden.vbs` → `run_gmail_poll_once.bat` workflow every few minutes. The batch file stays in the project directory, scans the latest 20 inbox messages, generates today's local report, and uploads the Markdown/CSV report to the configured Drive folder.
+If you automate polling with Windows Task Scheduler, keep using the existing `run_gmail_poll_hidden.vbs` → `run_gmail_poll_once.bat` workflow every few minutes. The batch file stays in the project directory, scans the latest 20 inbox messages, generates today's local report, and uploads the Markdown/CSV/XLSX report to the configured Drive folder.
 
 To verify it is working:
 
@@ -244,7 +246,7 @@ To verify it is working:
 3. Confirm **Last Run Time** updates.
 4. Confirm **Last Run Result** is `0x0`.
 5. Check that `reports/generated/task-log.txt` is being updated.
-6. Confirm the log includes `GMAIL POLLING REPORT GENERATED`, `DRIVE UPLOAD COMPLETE`, a Markdown URL, and a CSV URL after a successful report upload.
+6. Confirm the log includes `GMAIL POLLING REPORT GENERATED`, `DRIVE UPLOAD COMPLETE`, Markdown/CSV/XLSX URLs after a successful report upload.
 7. Open the local dashboard and click **Load latest log**.
 
 ## Reading task-log.txt manually

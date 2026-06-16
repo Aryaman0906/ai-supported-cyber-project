@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import base64, json, os, socket
+import base64, json, os, socket, types, zipfile
 from pathlib import Path
 import sys
 
@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from api.gmail_client import labels_for_risk, parse_gmail_message
 from api.gmail_scanner import decode_pubsub_push
-from api.report_writer import generate_csv_report, generate_markdown_report
+from api.report_writer import generate_csv_report, generate_markdown_report, generate_xlsx_report_bytes
 from api.risk_engine import GmailRiskEngine, RiskResult
 from api.storage import InMemoryStorage
 
@@ -100,6 +100,10 @@ def test_report_generation():
     results = [{"message_id":"m1","date":"2026-06-13","sender_domain":"bad.test","risk_level":"high","score":0.9,"url_domains":["bad.test"],"reasons":["reason"]}]
     assert "High risk: 1" in generate_markdown_report("2026-06-13", results)
     assert "bad.test" in generate_csv_report(results)
+    xlsx_bytes = generate_xlsx_report_bytes(results)
+    assert xlsx_bytes.startswith(b"PK")
+    with zipfile.ZipFile(__import__("io").BytesIO(xlsx_bytes)) as workbook:
+        assert "xl/worksheets/sheet1.xml" in workbook.namelist()
 
 def test_storage_in_memory():
     storage = InMemoryStorage()
@@ -108,7 +112,7 @@ def test_storage_in_memory():
     assert storage.get_account("u@example.com")["last_history_id"] == "1"
     assert len(storage.get_scan_results_for_date("2026-06-13", "u@example.com")) == 1
 
-from api.gmail_poll_worker import ScanLock, format_report_output, format_scan_summary, generate_local_report, parse_drive_folder_id, scan_latest_inbox
+from api.gmail_poll_worker import ScanLock, format_report_output, format_scan_summary, generate_local_report, parse_drive_folder_id, scan_latest_inbox, upload_report_files_to_drive
 
 class FakeExecute:
     def __init__(self, value=None): self.value = value or {}
@@ -157,6 +161,7 @@ def test_local_report_generation(tmp_path, monkeypatch):
     output = generate_local_report(storage, "2026-06-13")
     assert Path(output["markdown_path"]).exists()
     assert Path(output["csv_path"]).exists()
+    assert Path(output["xlsx_path"]).exists()
 
 def test_local_polling_console_format_hides_skipped_ids():
     summary = {
@@ -188,7 +193,7 @@ def test_local_polling_console_format_hides_skipped_ids():
     assert "Mock reason" in output
 
 def test_local_report_console_format():
-    output = format_report_output({"date": "2026-06-15", "markdown_path": "reports/generated/2026-06-15/report.md", "csv_path": "reports/generated/2026-06-15/report.csv"})
+    output = format_report_output({"date": "2026-06-15", "markdown_path": "reports/generated/2026-06-15/report.md", "csv_path": "reports/generated/2026-06-15/report.csv", "xlsx_path": "reports/generated/2026-06-15/report.xlsx"})
     assert "GMAIL POLLING REPORT GENERATED" in output
     assert "reports/generated/2026-06-15/report.md" in output
 
@@ -199,20 +204,68 @@ def test_drive_folder_url_and_raw_id_parsing():
     assert parse_drive_folder_id(url) == folder_id
     assert parse_drive_folder_id(folder_id) == folder_id
 
+
+
+def test_drive_upload_behavior_mocked(tmp_path, monkeypatch):
+    markdown = tmp_path / "gmail_poll_report.md"
+    csv_path = tmp_path / "gmail_poll_report.csv"
+    xlsx_path = tmp_path / "gmail_poll_report.xlsx"
+    markdown.write_text("# report", encoding="utf-8")
+    csv_path.write_text("message_id", encoding="utf-8")
+    xlsx_path.write_bytes(b"PK fake")
+
+    class FakeMediaFileUpload:
+        def __init__(self, path, mimetype, resumable=False):
+            self.path = path
+            self.mimetype = mimetype
+
+    class FakeCreate:
+        def __init__(self, body):
+            self.body = body
+        def execute(self):
+            return {"id": self.body["name"], "webViewLink": f"https://drive.test/{self.body['name']}"}
+
+    class FakeFiles:
+        def create(self, body, media_body, fields):
+            return FakeCreate(body)
+
+    class FakeDriveService:
+        def files(self):
+            return FakeFiles()
+
+    fake_http = types.ModuleType("googleapiclient.http")
+    fake_http.MediaFileUpload = FakeMediaFileUpload
+    monkeypatch.setitem(sys.modules, "googleapiclient", types.ModuleType("googleapiclient"))
+    monkeypatch.setitem(sys.modules, "googleapiclient.http", fake_http)
+    monkeypatch.setattr("api.gmail_poll_worker.build_local_drive_service", lambda: FakeDriveService())
+
+    result = upload_report_files_to_drive({
+        "markdown_path": str(markdown),
+        "csv_path": str(csv_path),
+        "xlsx_path": str(xlsx_path),
+    }, "https://drive.google.com/drive/folders/folder123?usp=drive_link")
+
+    assert result["markdown"]["webViewLink"].endswith("gmail_poll_report.md")
+    assert result["csv"]["webViewLink"].endswith("gmail_poll_report.csv")
+    assert result["xlsx"]["webViewLink"].endswith("gmail_poll_report.xlsx")
+
 def test_report_console_format_includes_drive_urls():
     output = format_report_output({
         "date": "2026-06-16",
         "markdown_path": "reports/generated/2026-06-16/gmail_poll_report.md",
         "csv_path": "reports/generated/2026-06-16/gmail_poll_report.csv",
+        "xlsx_path": "reports/generated/2026-06-16/gmail_poll_report.xlsx",
         "drive": {
             "markdown": {"webViewLink": "https://drive.google.com/file/d/md"},
             "csv": {"webViewLink": "https://drive.google.com/file/d/csv"},
+            "xlsx": {"webViewLink": "https://drive.google.com/file/d/xlsx"},
         },
     })
     assert "GMAIL POLLING REPORT GENERATED" in output
     assert "DRIVE UPLOAD COMPLETE" in output
     assert "Markdown URL: https://drive.google.com/file/d/md" in output
     assert "CSV URL     : https://drive.google.com/file/d/csv" in output
+    assert "XLSX URL    : https://drive.google.com/file/d/xlsx" in output
 
 from api import polling_dashboard
 
@@ -245,6 +298,7 @@ def test_polling_report_listing_ignores_string_folder(tmp_path):
     assert [row["date"] for row in rows] == ["2026-06-13"]
     assert rows[0]["markdown_files"]
     assert rows[0]["csv_files"]
+    assert "xlsx_files" in rows[0]
 
 def test_polling_latest_log_reads_last_100_lines(tmp_path):
     log = tmp_path / "task-log.txt"

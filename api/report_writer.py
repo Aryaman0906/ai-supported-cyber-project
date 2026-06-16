@@ -1,8 +1,8 @@
-"""Daily Markdown/CSV report generation for Gmail scan results."""
+"""Daily Markdown/CSV/XLSX report generation for Gmail scan results."""
 from __future__ import annotations
 
 from collections import Counter
-import csv, io
+import csv, html, io, zipfile
 from typing import Any
 
 
@@ -37,4 +37,75 @@ def generate_csv_report(results: list[dict[str, Any]]) -> str:
     writer = csv.DictWriter(output, fieldnames=fields); writer.writeheader()
     for r in results:
         writer.writerow({"message_id": r.get("message_id", ""), "date": r.get("date", ""), "sender_domain": r.get("sender_domain", ""), "risk_level": r.get("risk_level", ""), "score": r.get("score", ""), "url_domains": ";".join(r.get("url_domains", [])), "reasons": " | ".join(r.get("reasons", []))})
+    return output.getvalue()
+
+
+
+def _worksheet_xml(rows: list[list[Any]]) -> str:
+    row_xml: list[str] = []
+    for row_number, row in enumerate(rows, start=1):
+        cells = []
+        for column_number, value in enumerate(row, start=1):
+            column = chr(ord("A") + column_number - 1)
+            safe_value = html.escape(str(value or ""))
+            cells.append(f'<c r="{column}{row_number}" t="inlineStr"><is><t>{safe_value}</t></is></c>')
+        row_xml.append(f'<row r="{row_number}">{"".join(cells)}</row>')
+    return "".join(row_xml)
+
+
+def generate_xlsx_report_bytes(results: list[dict[str, Any]]) -> bytes:
+    """Generate a small XLSX workbook for local Gmail scan results."""
+    fields = ["message_id", "date", "sender_domain", "risk_level", "score", "url_domains", "reasons"]
+    rows: list[list[Any]] = [fields]
+    for result in results:
+        rows.append([
+            result.get("message_id", ""),
+            result.get("date", ""),
+            result.get("sender_domain", ""),
+            result.get("risk_level", ""),
+            result.get("score", ""),
+            ";".join(result.get("url_domains", [])),
+            " | ".join(result.get("reasons", [])),
+        ])
+
+    worksheet = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        f'<sheetData>{_worksheet_xml(rows)}</sheetData></worksheet>'
+    )
+    workbook = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        '<sheets><sheet name="Gmail Report" sheetId="1" r:id="rId1"/></sheets></workbook>'
+    )
+    rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        'Target="xl/workbook.xml"/></Relationships>'
+    )
+    workbook_rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+        'Target="worksheets/sheet1.xml"/></Relationships>'
+    )
+    content_types = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        '</Types>'
+    )
+
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as workbook_zip:
+        workbook_zip.writestr("[Content_Types].xml", content_types)
+        workbook_zip.writestr("_rels/.rels", rels)
+        workbook_zip.writestr("xl/workbook.xml", workbook)
+        workbook_zip.writestr("xl/_rels/workbook.xml.rels", workbook_rels)
+        workbook_zip.writestr("xl/worksheets/sheet1.xml", worksheet)
     return output.getvalue()

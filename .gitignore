@@ -27,3 +27,9 @@ reports/generated/
 # Runtime lock files
 runtime/
 
+reports/private/
+logs/
+task-log.txt
+.local/
+models/*.joblib
+runtime/*.lock
