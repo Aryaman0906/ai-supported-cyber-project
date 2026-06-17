@@ -113,7 +113,6 @@ def build_local_drive_service(credentials_path: Path = CREDENTIALS_PATH, token_p
     return build("drive", "v3", credentials=credentials, cache_discovery=False)
 
 
-
 class ScanLock:
     """Atomic lock-file guard for scheduled Gmail scans."""
 
@@ -160,6 +159,11 @@ class ScanLock:
         if self._is_timed_out():
             return True
 
+        pid = metadata.get("pid")
+        hostname = metadata.get("hostname")
+        if not isinstance(pid, int) or hostname != socket.gethostname():
+            return False
+
         if os.name == "nt":
             # On Windows, os.kill(pid, 0) is not a safe Unix-style process-exists check.
             # Use timeout-based stale-lock cleanup as the cross-platform fallback.
@@ -195,6 +199,7 @@ def run_once_with_lock(limit: int, force: bool = False, dry_run: bool = False) -
         if not lock.acquired:
             return None
         return run_once(limit=limit, force=force, dry_run=dry_run)
+
 
 def build_local_risk_engine() -> GmailRiskEngine:
     """Build the local risk engine, loading models if they exist.
@@ -321,7 +326,6 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-
 def _format_list(values: list[Any]) -> str:
     """Format a short list for console output without exposing raw JSON."""
     clean_values = [str(value) for value in values if value]
@@ -377,7 +381,6 @@ def format_scan_summary(summary: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-
 def parse_drive_folder_id(folder: str) -> str:
     """Extract a Drive folder ID from a folder URL or return a raw folder ID.
 
@@ -422,6 +425,7 @@ def upload_report_files_to_drive(report: dict[str, str], drive_folder: str) -> d
         "xlsx": upload("xlsx_path", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
     }
 
+
 def format_report_output(report: dict[str, Any]) -> str:
     """Return clean console output for local report generation and Drive upload."""
     lines = [
@@ -445,6 +449,7 @@ def format_report_output(report: dict[str, Any]) -> str:
             ]
         )
     return "\n".join(lines)
+
 
 def generate_local_report(storage: LocalJsonStorage, report_date: str | None = None) -> dict[str, str]:
     """Generate Markdown, CSV, and XLSX reports under reports/generated/YYYY-MM-DD/."""
