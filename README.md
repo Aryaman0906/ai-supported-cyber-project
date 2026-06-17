@@ -165,6 +165,12 @@ Generate reports and upload them to Google Drive:
 python -m api.gmail_poll_worker --report-today --upload-drive --drive-folder "<GOOGLE_DRIVE_FOLDER_URL_OR_ID>"
 ```
 
+For scheduled Drive upload, do **not** hardcode a real Drive folder URL or ID in `run_gmail_poll_once.bat`. Instead, create an ignored `.env` file in the project root or set a Windows environment variable:
+
+```text
+DRIVE_REPORT_FOLDER=<GOOGLE_DRIVE_FOLDER_URL_OR_ID>
+```
+
 The report workflow creates:
 
 ```text
@@ -182,7 +188,7 @@ run_gmail_poll_hidden.vbs
 run_gmail_poll_once.bat
 ```
 
-The batch file runs one scan, then generates and optionally uploads the daily report. It also writes a local task log for proof/debugging.
+The batch file runs one scan, then generates the daily report. If `DRIVE_REPORT_FOLDER` is configured through an ignored `.env` file or a Windows environment variable, it also uploads the report files to Google Drive. If the variable is missing, it safely generates local reports only.
 
 A lock file prevents overlapping scheduled scans:
 
@@ -227,7 +233,7 @@ python -m api.gmail_poll_worker --report-today
 
 ## Files that must stay private
 
-Do not commit real credentials, OAuth tokens, generated reports, logs, local state, lock files, or model artifacts containing private data. `.gitignore` is configured to keep these out of Git.
+Do not commit real credentials, OAuth tokens, generated reports, logs, local state, lock files, model artifacts, Drive folder URLs, Drive folder IDs, or private email data. `.gitignore` is configured to keep the main local files out of Git.
 
 Important ignored examples:
 
@@ -259,7 +265,7 @@ Add these screenshots or redacted outputs to your report/demo evidence:
 ## Responsible-use and limitations
 
 - Use sanitized data wherever possible.
-- Do not publish real email bodies, private links, credentials, tokens, or personal data.
+- Do not publish real email bodies, private links, credentials, tokens, Drive folder URLs, Drive folder IDs, or personal data.
 - Treat all model and rule outputs as assistive signals only.
 - Human review is required before taking security action.
 - Small starter datasets can produce false positives and false negatives.
