@@ -1,0 +1,30 @@
+# Core data science and machine learning
+pandas==2.2.2
+scikit-learn==1.5.1
+joblib==1.4.2
+openpyxl==3.1.5
+
+# API server for real-time prediction endpoints
+fastapi==0.112.0
+uvicorn[standard]==0.30.5
+pydantic==2.8.2
+
+# URL feature extraction and optional external checks
+tldextract==5.1.2
+requests==2.32.3
+python-dotenv==1.0.1
+
+# Real-time file monitoring for logs or simulated email files
+watchdog==4.0.1
+
+# Optional development/testing helpers
+pytest==8.3.2
+
+# Google Cloud / Gmail bot integration
+google-api-python-client==2.143.0
+google-auth==2.34.0
+google-auth-oauthlib==1.2.1
+google-auth-httplib2==0.2.0
+google-cloud-firestore==2.19.0
+google-cloud-secret-manager==2.20.2
+cryptography==43.0.1
