@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections import Counter
-import csv, html, io, zipfile
+import csv, html, importlib.util, io, zipfile
 from typing import Any
 
 
@@ -53,21 +53,7 @@ def _worksheet_xml(rows: list[list[Any]]) -> str:
     return "".join(row_xml)
 
 
-def generate_xlsx_report_bytes(results: list[dict[str, Any]]) -> bytes:
-    """Generate a small XLSX workbook for local Gmail scan results."""
-    fields = ["message_id", "date", "sender_domain", "risk_level", "score", "url_domains", "reasons"]
-    rows: list[list[Any]] = [fields]
-    for result in results:
-        rows.append([
-            result.get("message_id", ""),
-            result.get("date", ""),
-            result.get("sender_domain", ""),
-            result.get("risk_level", ""),
-            result.get("score", ""),
-            ";".join(result.get("url_domains", [])),
-            " | ".join(result.get("reasons", [])),
-        ])
-
+def _generate_basic_xlsx_report_bytes(rows: list[list[Any]]) -> bytes:
     worksheet = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
@@ -100,7 +86,6 @@ def generate_xlsx_report_bytes(results: list[dict[str, Any]]) -> bytes:
         '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
         '</Types>'
     )
-
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as workbook_zip:
         workbook_zip.writestr("[Content_Types].xml", content_types)
@@ -108,4 +93,117 @@ def generate_xlsx_report_bytes(results: list[dict[str, Any]]) -> bytes:
         workbook_zip.writestr("xl/workbook.xml", workbook)
         workbook_zip.writestr("xl/_rels/workbook.xml.rels", workbook_rels)
         workbook_zip.writestr("xl/worksheets/sheet1.xml", worksheet)
+    return output.getvalue()
+
+
+def _clean_xlsx_value(value: Any) -> str:
+    """Normalize values so they are safe and readable in Excel cells."""
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple, set)):
+        value = "; ".join(_clean_xlsx_value(item) for item in value)
+    text = _illegal_characters_re().sub("", str(value))
+    return " ".join(text.replace("\r", " ").replace("\n", " ").split())
+
+
+def _first_present_value(record: dict[str, Any], keys: tuple[str, ...]) -> Any:
+    for key in keys:
+        value = record.get(key)
+        if value is not None and value != "":
+            return value
+    return ""
+
+
+def _illegal_characters_re():
+    from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+
+    return ILLEGAL_CHARACTERS_RE
+
+
+def _risk_fill(risk_level: str):
+    normalized_risk = risk_level.strip().lower()
+    from openpyxl.styles import PatternFill
+
+    if normalized_risk in {"high", "phishing", "dangerous", "malicious"}:
+        return PatternFill(fill_type="solid", fgColor="FCE4D6")
+    if normalized_risk in {"medium", "suspicious", "warning"}:
+        return PatternFill(fill_type="solid", fgColor="FFF2CC")
+    if normalized_risk in {"low", "safe", "legitimate", "clean"}:
+        return PatternFill(fill_type="solid", fgColor="E2F0D9")
+    return PatternFill(fill_type="solid", fgColor="E7E6E6")
+
+
+def generate_xlsx_report_bytes(results: list[dict[str, Any]]) -> bytes:
+    """Generate a formatted XLSX workbook for local Gmail scan results."""
+    columns: list[tuple[str, tuple[str, ...], int]] = [
+        ("Message ID", ("message_id", "id", "gmail_message_id"), 28),
+        ("Scanned At", ("created_at", "date", "scanned_at", "scan_time", "timestamp"), 22),
+        ("Sender", ("sender", "from", "from_email"), 32),
+        ("Sender Domain", ("sender_domain",), 24),
+        ("Subject", ("subject_preview", "subject", "email_subject"), 42),
+        ("Risk Level", ("risk_level", "risk", "prediction"), 16),
+        ("Score", ("score", "risk_score", "confidence"), 12),
+        ("Gmail Label", ("labels_applied", "label", "gmail_label", "applied_label"), 24),
+        ("Reason", ("reasons", "reason", "explanation", "summary", "details"), 60),
+    ]
+    headers = [header for header, _, _ in columns]
+
+    if importlib.util.find_spec("openpyxl") is None:
+        rows = [headers]
+        for result in results:
+            rows.append([str(_first_present_value(result, keys) or "") for _, keys, _ in columns])
+        return _generate_basic_xlsx_report_bytes(rows)
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.table import Table, TableStyleInfo
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Gmail Report"
+
+    worksheet.append(headers)
+
+    for result in results:
+        worksheet.append([_clean_xlsx_value(_first_present_value(result, keys)) for _, keys, _ in columns])
+
+    header_fill = PatternFill(fill_type="solid", fgColor="1F4E78")
+    header_font = Font(color="FFFFFF", bold=True)
+    thin_side = Side(style="thin", color="D9E2F3")
+    border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+    wrap_alignment = Alignment(wrap_text=True, vertical="top")
+
+    for cell in worksheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = border
+
+    for row in worksheet.iter_rows(min_row=2, max_row=worksheet.max_row):
+        fill = _risk_fill(str(row[5].value or ""))
+        for cell in row:
+            cell.fill = fill
+            cell.alignment = wrap_alignment
+            cell.border = border
+
+    for column_number, (_, _, width) in enumerate(columns, start=1):
+        worksheet.column_dimensions[get_column_letter(column_number)].width = width
+
+    worksheet.freeze_panes = "A2"
+    worksheet.auto_filter.ref = worksheet.dimensions
+
+    table_ref = f"A1:{get_column_letter(len(columns))}{max(worksheet.max_row, 1)}"
+    table = Table(displayName="GmailPollReport", ref=table_ref)
+    table.tableStyleInfo = TableStyleInfo(
+        name="TableStyleMedium2",
+        showFirstColumn=False,
+        showLastColumn=False,
+        showRowStripes=False,
+        showColumnStripes=False,
+    )
+    worksheet.add_table(table)
+
+    output = io.BytesIO()
+    workbook.save(output)
     return output.getvalue()
