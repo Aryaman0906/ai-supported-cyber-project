@@ -5,7 +5,15 @@ REM Local no-billing Gmail polling task runner.
 REM This file writes only clean scan/report summaries and never prints secrets.
 cd /d "%~dp0"
 
-set "DRIVE_REPORT_FOLDER=https://drive.google.com/drive/folders/1Ko8e6ldd3TasM-JQXpJO0wyYJ8S4u8EM?usp=drive_link"
+REM Optional local configuration for Drive uploads.
+REM Set DRIVE_REPORT_FOLDER as a Windows environment variable, or create an ignored
+REM .env.local file in the project root with this line:
+REM DRIVE_REPORT_FOLDER=https://drive.google.com/drive/folders/YOUR_FOLDER_ID
+if exist ".env.local" (
+    for /f "usebackq tokens=1,* delims==" %%A in (".env.local") do (
+        if /i "%%A"=="DRIVE_REPORT_FOLDER" set "DRIVE_REPORT_FOLDER=%%B"
+    )
+)
 
 if not exist "reports\generated" mkdir "reports\generated"
 
@@ -17,7 +25,13 @@ python -m api.gmail_poll_worker --once --limit 20 >> "reports\generated\task-log
 set SCAN_EXIT_CODE=%ERRORLEVEL%
 
 echo. >> "reports\generated\task-log.txt"
-python -m api.gmail_poll_worker --report-today --upload-drive --drive-folder "%DRIVE_REPORT_FOLDER%" >> "reports\generated\task-log.txt" 2>&1
+if "%DRIVE_REPORT_FOLDER%"=="" (
+    echo DRIVE_REPORT_FOLDER is not configured. Generating local report only. >> "reports\generated\task-log.txt"
+    python -m api.gmail_poll_worker --report-today >> "reports\generated\task-log.txt" 2>&1
+) else (
+    echo DRIVE_REPORT_FOLDER is configured. Generating report and uploading to Drive. >> "reports\generated\task-log.txt"
+    python -m api.gmail_poll_worker --report-today --upload-drive --drive-folder "%DRIVE_REPORT_FOLDER%" >> "reports\generated\task-log.txt" 2>&1
+)
 set REPORT_EXIT_CODE=%ERRORLEVEL%
 
 echo. >> "reports\generated\task-log.txt"
