@@ -2,26 +2,23 @@
 
 ## Title
 
-**AI-Assisted Defensive Cybersecurity Mini-Project: Near-Real-Time Gmail Phishing Detection, URL Analysis, Log Triage, and Security Reporting**
+**AI-Assisted Defensive Cybersecurity Mini-Project: Real-Time Phishing Analysis and Log Triage with Responsible-Use Write-Up**
 
 ## Abstract
 
-This project is a defensive cybersecurity mini-project that combines ML-based phishing analysis, URL analysis, rule-based log triage, and Gmail security automation. The Gmail automation uses near-real-time local scheduled polling through Windows Task Scheduler. It uses the Gmail API and optional Drive API integration, not paid Pub/Sub/Cloud Run monitoring.
+This project is a defensive cybersecurity mini-project that demonstrates how machine learning and rule-based analysis can support phishing detection and log triage in real time. The project separates offline model training from real-time prediction. Text and URL models are trained in separate scripts, saved with `joblib`, and loaded once by a FastAPI server. The API provides endpoints for analyzing email/text, URLs, and sanitized web server log lines. A simple frontend allows users to paste safe examples and view predictions, confidence/risk scores, explanations, and raw JSON results.
 
-The system analyzes email text, extracted URLs, and sanitized log lines. It applies non-destructive Gmail labels for scanned, low, medium, and high risk messages, then generates local Markdown, CSV, and XLSX reports. Reports can optionally be uploaded to Google Drive for backup/storage. FastAPI remains part of the local demo for text, URL, and log analysis with immediate prediction responses.
+The project also includes optional external URL reputation checks through VirusTotal and PhishTank, but these checks are disabled by default for privacy. A watchdog-based log monitor demonstrates real-time monitoring by watching a local sample log file and printing alerts when suspicious lines are appended.
 
 ## Problem statement
 
-Phishing messages, deceptive URLs, and suspicious web requests are common security problems. Beginners often study phishing detection only in notebooks, which does not show how a real defensive workflow would analyze messages, label risk, and summarize findings for review. This project solves that learning gap by creating a small working application with:
+Phishing messages, deceptive URLs, and suspicious web requests are common security problems. Beginners often study phishing detection only in notebooks, which does not show how a real system would respond to user input in real time. This project solves that learning gap by creating a small working application with:
 
-- Offline model training scripts.
-- Saved local models.
-- FastAPI prediction endpoints for text, URL, and log analysis.
-- A browser frontend for local demos.
+- Offline training scripts.
+- Saved models.
+- Real-time FastAPI endpoints.
+- A browser frontend.
 - A local log-file watcher.
-- Near-real-time scheduled Gmail polling.
-- Gmail labeling and local security reports.
-- Optional Google Drive report upload.
 - Responsible-use documentation.
 
 ## Objectives
@@ -33,11 +30,8 @@ The main objectives are:
 3. Load trained models once at API startup.
 4. Return immediate JSON results through FastAPI.
 5. Provide understandable reasons for each prediction.
-6. Demonstrate local real-time API predictions and watchdog sample-log monitoring.
-7. Demonstrate near-real-time scheduled Gmail polling after user OAuth authorization.
-8. Apply non-destructive Gmail labels instead of deleting or blocking messages.
-9. Generate Markdown, CSV, and XLSX reports for human review.
-10. Document limitations, privacy concerns, and responsible use.
+6. Demonstrate local real-time monitoring with watchdog.
+7. Document limitations, privacy concerns, and responsible use.
 
 ## Scope
 
@@ -47,14 +41,8 @@ The main objectives are:
 - URL phishing classification using explainable URL features and Random Forest.
 - Optional external URL checks using API keys from environment variables.
 - Rule-based log triage for sanitized Apache/Nginx-style logs.
-- Watchdog-based local sample-log monitoring.
+- Watchdog-based local log monitoring.
 - Simple HTML frontend.
-- Near-real-time scheduled Gmail polling through a local Windows scheduler.
-- Gmail API inbox scanning after explicit OAuth authorization.
-- Safe parsing of plain-text and HTML email bodies.
-- AI-Cyber Gmail labels for scanned, low, medium, and high risk messages.
-- Local Markdown, CSV, and XLSX report generation.
-- Optional Google Drive report upload through the Drive API.
 - Responsible-use and limitation documentation.
 
 ### Not included
@@ -62,16 +50,13 @@ The main objectives are:
 - No phishing generation.
 - No credential collection.
 - No exploitation or scanning.
-- No unauthorized inbox access. Gmail polling works only after explicit OAuth authorization from the user.
-- No full real-time Gmail push monitoring in the submitted version.
-- No full cloud-native SOC deployment.
-- No automatic deletion, forwarding, replying, or blocking of emails.
+- No real inbox scraping.
 - No production deployment.
 - No automatic blocking or enforcement actions.
 
 ## System architecture
 
-The project has five major layers.
+The project has three major layers.
 
 ### 1. Offline training layer
 
@@ -80,9 +65,9 @@ Training scripts are stored in `train/`:
 - `train/train_text_model.py`
 - `train/train_url_model.py`
 
-These scripts load sanitized datasets from `data/`, train models, evaluate them, and save model files into `models/`. Training is separate from prediction so the application can load saved models instead of retraining on every request.
+These scripts load sanitized datasets from `data/`, train models, evaluate them, and save model files into `models/`.
 
-### 2. Local FastAPI analysis layer
+### 2. Real-time API layer
 
 FastAPI code is stored in `api/`:
 
@@ -100,73 +85,16 @@ The API exposes:
 - `POST /analyze-url`
 - `POST /analyze-log-line`
 
-The text and URL models are loaded once when the API starts. Prediction requests reuse the loaded models and do not retrain. This layer can provide real-time local prediction responses for pasted text, URLs, and sanitized log lines.
+The text and URL models are loaded once when the API starts. Prediction requests reuse the loaded models and do not retrain.
 
-### 3. Near-real-time Gmail polling layer
+### 3. User interface and monitoring layer
 
-The submitted Gmail workflow is near-real-time scheduled Gmail polling, not full real-time Gmail monitoring. The local scheduler periodically launches the Gmail polling worker after the user has completed OAuth authorization.
+The UI and monitoring tools are:
 
-The working automation path is:
+- `frontend/index.html`
+- `monitor_logs.py`
 
-```text
-Windows Task Scheduler
-→ hidden VBS runner
-→ batch file
-→ local Gmail polling worker
-→ Gmail API inbox scan
-→ skip already scanned messages
-→ parse plain-text and HTML email bodies safely
-→ analyze text and URLs
-→ apply AI-Cyber Gmail labels
-→ generate Markdown, CSV, and XLSX reports
-→ optionally upload reports to Google Drive
-```
-
-### 4. Gmail labeling and reporting layer
-
-The Gmail response is intentionally non-destructive. Instead of deleting, forwarding, replying to, or blocking emails, the worker applies labels:
-
-```text
-AI-Cyber/Scanned
-AI-Cyber/Low
-AI-Cyber/Medium
-AI-Cyber/High
-```
-
-Reports are generated locally in Markdown, CSV, and XLSX formats. Google Drive upload is optional and is used only for report backup/storage, not as a full cloud security backend.
-
-### 5. Optional future cloud layer
-
-Cloud Run, Pub/Sub, and a fully cloud-native SOC-style deployment are future optional scope only. They are not the current submitted architecture. The final working Gmail automation uses local Windows scheduled polling with Gmail API access after user OAuth authorization.
-
-## Near-real-time Gmail polling workflow
-
-The Gmail automation workflow is:
-
-```text
-Windows Task Scheduler
-→ hidden VBS runner
-→ batch file
-→ local Gmail polling worker
-→ Gmail API inbox scan
-→ skip already scanned messages
-→ parse plain-text and HTML email bodies safely
-→ analyze text and URLs
-→ apply AI-Cyber Gmail labels
-→ generate Markdown, CSV, and XLSX reports
-→ optionally upload reports to Google Drive
-```
-
-The worker uses Gmail API access only after explicit OAuth authorization from the user. It skips already scanned messages, parses HTML emails as text without executing scripts or styles, analyzes suspicious links as indicators without opening them in a browser, and records results for human review.
-
-The labels used by the submitted workflow are:
-
-```text
-AI-Cyber/Scanned
-AI-Cyber/Low
-AI-Cyber/Medium
-AI-Cyber/High
-```
+The frontend calls FastAPI endpoints using `fetch()`. The monitor watches `data/sample_logs.log` and analyzes new lines as they are appended.
 
 ## Data used
 
@@ -215,13 +143,12 @@ A `RandomForestClassifier` is trained on these features. The API returns the ext
 
 ## External checks
 
-Optional VirusTotal and PhishTank checks can provide supporting URL reputation evidence. These checks:
+Phase 5 adds optional VirusTotal and PhishTank checks. These checks:
 
 - Use environment variables for API keys.
 - Are disabled unless `include_external_checks` is set to `true`.
 - Return `skipped` when API keys are missing.
 - Include privacy warnings.
-- May disclose submitted URLs to third-party services.
 
 External checks are supporting evidence only and should not replace human review.
 
@@ -246,58 +173,15 @@ The output includes:
 
 ## Real-time functionality
 
-This section uses real-time only for local FastAPI prediction responses and watchdog sample-log monitoring. Gmail automation is described as near-real-time scheduled Gmail polling.
-
-## Real-time and near-real-time functionality
-
-The project separates real-time local analysis from near-real-time Gmail automation.
+The project satisfies two real-time requirements:
 
 ### Level 1: Real-time API analysis
 
 The user can paste text, URLs, or log lines into the frontend or API. FastAPI returns immediate JSON responses. The trained models are already loaded in memory and are not retrained during prediction.
 
-### Level 2: Real-time sample-log monitoring
+### Level 2: Real-time monitoring
 
 `monitor_logs.py` uses watchdog to watch a local sample log file. When a new line is appended, the script analyzes it and prints an alert if the risk level is medium or high.
-
-### Level 3: Near-real-time scheduled Gmail polling
-
-Windows Task Scheduler runs the local Gmail polling worker periodically. This gives practical near-real-time scheduled Gmail polling without paid cloud dependencies. It is not full real-time Gmail push monitoring.
-
-## Security and privacy notes
-
-- The project is defensive-only.
-- Gmail access requires explicit user OAuth authorization.
-- OAuth files such as `credentials.json` and `token.json` are local-only and ignored by Git.
-- Generated reports, logs, runtime files, local storage, and model artifacts should not be committed.
-- HTML emails are parsed as text; scripts and styles must not be executed.
-- Suspicious links are analyzed as indicators and should not be opened in a browser.
-- Optional external threat-intelligence checks may disclose submitted URLs to third-party services.
-- Human review is required before taking action.
-- False positives and false negatives are expected because this is a student/demo system.
-
-
-## Limitations
-
-This is a student/demo cybersecurity system, not a production email security gateway or enterprise SOC platform. Important limitations include:
-
-- Gmail automation uses near-real-time scheduled Gmail polling, not full real-time Gmail push monitoring.
-- The submitted version is not a full cloud-native SOC deployment.
-- The models use limited demo datasets and can produce false positives and false negatives.
-- Gmail labels are assistive indicators and do not replace human review.
-- Optional external checks may disclose submitted URLs to third-party services when enabled.
-- Local machine security affects OAuth token, report, and runtime-file security.
-
-## Future improvements
-
-Possible future improvements include:
-
-- More representative sanitized datasets and stronger evaluation metrics.
-- Safer token storage using operating-system secret stores.
-- Report encryption or protected archives for sensitive summaries.
-- Better dashboards and review workflows for labeled Gmail messages.
-- Optional Cloud Run/Pub/Sub processing for users who specifically want a cloud deployment, clearly separate from the current submitted architecture.
-- Additional safeguards for URL analysis and third-party reputation lookups.
 
 ## How to run the project
 
@@ -353,3 +237,54 @@ Then open:
 ```text
 http://127.0.0.1:8080
 ```
+
+### 6. Run log monitoring demo
+
+```bash
+python monitor_logs.py --file data/sample_logs.log
+```
+
+Append a sample line in another terminal:
+
+```bash
+printf '%s\n' '203.0.113.50 - - [13/Jun/2026:10:05:00 +0000] "GET /admin HTTP/1.1" 403 300 "-" "Scanner-Test-Agent"' >> data/sample_logs.log
+```
+
+## Expected outputs
+
+The system returns JSON results such as:
+
+- `prediction` or `verdict`.
+- `confidence`, `score`, or `risk_score`.
+- `risk_level`.
+- `reasons`.
+- `safety_note`.
+
+The frontend displays these results in a readable way.
+
+## Limitations
+
+- Starter datasets are small and not production-grade.
+- The text model may overfit obvious keywords.
+- URL structural features cannot prove a URL is safe or malicious.
+- Rule-based log triage may miss subtle attacks.
+- External reputation providers may have incomplete or outdated data.
+- The frontend is for local demos only.
+- Human review is required.
+
+## Future improvements
+
+Possible extensions include:
+
+- Larger permission-safe datasets.
+- Better model evaluation and cross-validation.
+- More robust URL feature engineering.
+- Optional IsolationForest for log anomaly detection.
+- Unit tests and CI.
+- Authentication and rate limiting for the API.
+- Better frontend design and charts.
+- Safe test inbox integration using only a dedicated test account.
+
+## Conclusion
+
+This project demonstrates a complete beginner-friendly defensive workflow: train models offline, load them once in a real-time API, analyze pasted inputs, monitor a local log file, and document responsible use. It is suitable as a college mini-project because it combines Python, machine learning, FastAPI, cybersecurity triage, frontend basics, and ethical limitations in one coherent system.

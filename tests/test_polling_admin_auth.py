@@ -5,16 +5,27 @@ from pathlib import Path
 
 import pytest
 
-HAS_FASTAPI = importlib.util.find_spec("fastapi") is not None and importlib.util.find_spec("httpx") is not None
+HAS_FASTAPI = importlib.util.find_spec("fastapi") is not None
 
 if HAS_FASTAPI:
-    from fastapi.testclient import TestClient
+    from fastapi import HTTPException, status
 
-    from api.main import app
+    from api.main import (
+        app,
+        local_polling_latest_log,
+        local_polling_reports,
+        local_polling_status,
+        require_local_admin,
+    )
 
-    client = TestClient(app)
-else:
-    client = None
+
+PROTECTED_ROUTES = {
+    "/polling/status",
+    "/polling/scan-now",
+    "/polling/report-today",
+    "/polling/latest-log",
+    "/polling/reports",
+}
 
 
 @pytest.mark.skipif(HAS_FASTAPI, reason="source fallback only needed when FastAPI is unavailable")
@@ -24,54 +35,63 @@ def test_polling_admin_auth_source_is_configured_without_fastapi_dependency():
     assert "def require_local_admin" in source
     assert "LOCAL_ADMIN_TOKEN" in source
     assert "X-Local-Admin-Token" in source
-    for route in (
-        '@app.get("/polling/status", dependencies=[Depends(require_local_admin)])',
-        '@app.post("/polling/scan-now", dependencies=[Depends(require_local_admin)])',
-        '@app.post("/polling/report-today", dependencies=[Depends(require_local_admin)])',
-        '@app.get("/polling/latest-log", dependencies=[Depends(require_local_admin)])',
-        '@app.get("/polling/reports", dependencies=[Depends(require_local_admin)])',
-    ):
-        assert route in source
+    for route in PROTECTED_ROUTES:
+        assert f'"{route}"' in source
+        assert "dependencies=[Depends(require_local_admin)]" in source
 
 
-@pytest.mark.skipif(not HAS_FASTAPI, reason="FastAPI test client dependencies are unavailable")
+@pytest.mark.skipif(not HAS_FASTAPI, reason="FastAPI dependency is unavailable")
 def test_polling_endpoint_requires_configured_admin_token(monkeypatch):
     monkeypatch.delenv("LOCAL_ADMIN_TOKEN", raising=False)
 
-    response = client.get("/polling/reports")
+    with pytest.raises(HTTPException) as error:
+        require_local_admin("test-token")
 
-    assert response.status_code == 503
-    assert response.json()["detail"] == "LOCAL_ADMIN_TOKEN is not configured"
+    assert error.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert error.value.detail == "LOCAL_ADMIN_TOKEN is not configured"
 
 
-@pytest.mark.skipif(not HAS_FASTAPI, reason="FastAPI test client dependencies are unavailable")
+@pytest.mark.skipif(not HAS_FASTAPI, reason="FastAPI dependency is unavailable")
 def test_polling_endpoint_rejects_missing_admin_header(monkeypatch):
     monkeypatch.setenv("LOCAL_ADMIN_TOKEN", "test-token")
 
-    response = client.get("/polling/reports")
+    with pytest.raises(HTTPException) as error:
+        require_local_admin(None)
 
-    assert response.status_code == 401
-    assert response.json()["detail"] == "Invalid local admin token"
+    assert error.value.status_code == status.HTTP_401_UNAUTHORIZED
+    assert error.value.detail == "Invalid local admin token"
 
 
-@pytest.mark.skipif(not HAS_FASTAPI, reason="FastAPI test client dependencies are unavailable")
+@pytest.mark.skipif(not HAS_FASTAPI, reason="FastAPI dependency is unavailable")
 def test_polling_endpoint_rejects_wrong_admin_header(monkeypatch):
     monkeypatch.setenv("LOCAL_ADMIN_TOKEN", "test-token")
 
-    response = client.get(
-        "/polling/reports",
-        headers={"X-Local-Admin-Token": "wrong-token"},
-    )
+    with pytest.raises(HTTPException) as error:
+        require_local_admin("wrong-token")
 
-    assert response.status_code == 401
-    assert response.json()["detail"] == "Invalid local admin token"
+    assert error.value.status_code == status.HTTP_401_UNAUTHORIZED
+    assert error.value.detail == "Invalid local admin token"
 
 
-@pytest.mark.skipif(not HAS_FASTAPI, reason="FastAPI test client dependencies are unavailable")
+@pytest.mark.skipif(not HAS_FASTAPI, reason="FastAPI dependency is unavailable")
 def test_polling_read_only_endpoints_accept_correct_admin_header(monkeypatch):
     monkeypatch.setenv("LOCAL_ADMIN_TOKEN", "test-token")
-    headers = {"X-Local-Admin-Token": "test-token"}
 
-    for path in ("/polling/status", "/polling/latest-log", "/polling/reports"):
-        response = client.get(path, headers=headers)
-        assert response.status_code == 200
+    assert require_local_admin("test-token") is None
+    assert isinstance(local_polling_status(), dict)
+    assert isinstance(local_polling_latest_log(), dict)
+    assert isinstance(local_polling_reports(), dict)
+
+
+@pytest.mark.skipif(not HAS_FASTAPI, reason="FastAPI dependency is unavailable")
+def test_polling_routes_use_local_admin_dependency():
+    protected_routes = {
+        route.path: route
+        for route in app.routes
+        if getattr(route, "path", None) in PROTECTED_ROUTES
+    }
+
+    assert set(protected_routes) == PROTECTED_ROUTES
+    for route in protected_routes.values():
+        dependency_calls = [dependency.dependency for dependency in route.dependencies]
+        assert require_local_admin in dependency_calls
