@@ -7,10 +7,10 @@ cd /d "%~dp0"
 
 REM Optional local configuration for Drive uploads.
 REM Set DRIVE_REPORT_FOLDER as a Windows environment variable, or create an ignored
-REM .env.local file in the project root with this line:
-REM DRIVE_REPORT_FOLDER=https://drive.google.com/drive/folders/YOUR_FOLDER_ID
-if exist ".env.local" (
-    for /f "usebackq tokens=1,* delims==" %%A in (".env.local") do (
+REM .env file in the project root with this line:
+REM DRIVE_REPORT_FOLDER=YOUR_GOOGLE_DRIVE_FOLDER_URL_OR_ID
+if exist ".env" (
+    for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
         if /i "%%A"=="DRIVE_REPORT_FOLDER" set "DRIVE_REPORT_FOLDER=%%B"
     )
 )
