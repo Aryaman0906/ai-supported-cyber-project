@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import os
-from fastapi import FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -262,6 +262,23 @@ class DailyMaintenanceRequest(BaseModel):
     scan_count: int = Field(default=10, ge=1, le=100)
 
 
+def require_local_admin(
+    x_local_admin_token: str | None = Header(default=None, alias="X-Local-Admin-Token"),
+) -> None:
+    """Require a local admin token for polling dashboard endpoints."""
+    expected = os.getenv("LOCAL_ADMIN_TOKEN")
+    if not expected:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="LOCAL_ADMIN_TOKEN is not configured",
+        )
+    if x_local_admin_token != expected:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid local admin token",
+        )
+
+
 def _gmail_scanner() -> GmailScanner:
     return GmailScanner(gmail_storage, GmailRiskEngine(text_analyzer, url_analyzer))
 
@@ -395,13 +412,13 @@ class PollingScanRequest(BaseModel):
     dry_run: bool = Field(default=False)
 
 
-@app.get("/polling/status")
+@app.get("/polling/status", dependencies=[Depends(require_local_admin)])
 def local_polling_status() -> dict[str, Any]:
     """Return local Gmail polling bot dashboard status without exposing secrets."""
     return polling_status()
 
 
-@app.post("/polling/scan-now")
+@app.post("/polling/scan-now", dependencies=[Depends(require_local_admin)])
 def local_polling_scan_now(request: PollingScanRequest | None = None) -> dict[str, Any]:
     """Run the local Gmail polling worker once from FastAPI."""
     request = request or PollingScanRequest()
@@ -411,7 +428,7 @@ def local_polling_scan_now(request: PollingScanRequest | None = None) -> dict[st
         raise HTTPException(status_code=503, detail=f"Local Gmail polling scan failed: {error}") from error
 
 
-@app.post("/polling/report-today")
+@app.post("/polling/report-today", dependencies=[Depends(require_local_admin)])
 def local_polling_report_today() -> dict[str, Any]:
     """Generate today's local Gmail polling Markdown and CSV reports."""
     try:
@@ -420,13 +437,13 @@ def local_polling_report_today() -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=f"Local Gmail polling report failed: {error}") from error
 
 
-@app.get("/polling/latest-log")
+@app.get("/polling/latest-log", dependencies=[Depends(require_local_admin)])
 def local_polling_latest_log() -> dict[str, Any]:
     """Return the last 100 lines of reports/generated/task-log.txt."""
     return latest_log(max_lines=100)
 
 
-@app.get("/polling/reports")
+@app.get("/polling/reports", dependencies=[Depends(require_local_admin)])
 def local_polling_reports() -> dict[str, Any]:
     """List local Gmail polling report folders and files."""
     return reports_index()
