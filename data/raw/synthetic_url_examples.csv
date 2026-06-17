@@ -1,0 +1,17 @@
+url,label,source,category,date_added
+https://example.com/student/announcements,legitimate,synthetic,student_portal,2026-06-17
+https://example.org/workplace/maintenance,legitimate,synthetic,workplace_notice,2026-06-17
+https://example.net/cloud/shared-folder,legitimate,synthetic,cloud_storage,2026-06-17
+https://example.com/account/settings,legitimate,synthetic,account_notice,2026-06-17
+https://example.org/refunds/status,legitimate,synthetic,fake_refund,2026-06-17
+https://example.net/classroom/lab-instructions,legitimate,synthetic,fake_attachment,2026-06-17
+https://example.com/security/otp-safety,legitimate,synthetic,otp_theft,2026-06-17
+https://example.org/projects/slides-submit,legitimate,synthetic,student_portal,2026-06-17
+http://verify-account.example-risk.test/login,phishing,synthetic,credential_theft,2026-06-17
+http://password-reset.example-risk.test/urgent,phishing,synthetic,credential_theft,2026-06-17
+http://otp-check.example-risk.test/confirm-code,phishing,synthetic,otp_theft,2026-06-17
+http://refund-claim.example-risk.test/card-update,phishing,synthetic,fake_refund,2026-06-17
+http://invoice-download.example-risk.test/enable-macros,phishing,synthetic,fake_attachment,2026-06-17
+http://cloud-lock.example-risk.test/recover,phishing,synthetic,cloud_storage,2026-06-17
+http://student-portal.example-risk.test/verify-now,phishing,synthetic,student_portal,2026-06-17
+http://203.0.113.77/account/verify,phishing,synthetic,account_notice,2026-06-17

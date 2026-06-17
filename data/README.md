@@ -1,23 +1,70 @@
 # Data folder
 
-This folder contains the small synthetic training datasets used by the defensive phishing detection models.
+This project uses safe starter datasets for defensive learning. This PR does **not** add huge real phishing datasets because public data requires licensing, privacy, source-quality, and safety review first.
 
-## Files
+## Folder structure
 
-| File | Purpose | Columns |
-|---|---|---|
-| `phishing_dataset.csv` | Text/email phishing classifier training data | `text,label` |
-| `url_dataset.csv` | URL phishing classifier training data | `url,label` |
+```text
+data/
+├── raw/                  # safe synthetic source examples
+├── processed/            # metadata-rich master datasets
+├── phishing_dataset.csv  # final training text CSV used by train/train_text_model.py
+└── url_dataset.csv       # final training URL CSV used by train/train_url_model.py
+```
 
-## Dataset policy
+## Schemas
 
-- The rows are synthetic or generic examples.
-- Do not commit real Gmail message bodies, private inbox data, OAuth tokens, API keys, or personally identifiable information.
-- Keep labels limited to `legitimate` and `phishing` unless the training scripts are updated to support more classes.
-- Keep the dataset balanced enough that both classes are represented during train/test splitting.
+### raw/synthetic_text_examples.csv and processed/phishing_dataset_master.csv
 
-## Cloud recommendation
+```csv
+text,label,source,category,notes
+```
 
-For this project, the training datasets should stay in GitHub because they are small, synthetic, and useful for reproducibility.
+### raw/synthetic_url_examples.csv and processed/url_dataset_master.csv
 
-Do not upload real Gmail scan data to a public cloud database. Generated reports may be uploaded to Google Drive for backup/proof, but private email content should remain redacted. A cloud database is only worth adding later if the project becomes multi-user, deployed, or needs a hosted dashboard with persistent shared history.
+```csv
+url,label,source,category,date_added
+```
+
+### Final training files
+
+`data/phishing_dataset.csv` keeps exactly:
+
+```csv
+text,label
+```
+
+`data/url_dataset.csv` keeps exactly:
+
+```csv
+url,label
+```
+
+Existing training scripts depend on these final two-column files and do not need path changes.
+
+## Privacy and safety rules
+
+Do not commit:
+
+- Real Gmail bodies or inbox exports.
+- OAuth tokens, credentials, API keys, or `.env` files.
+- Generated reports or private logs.
+- Personally identifiable information.
+- Live malicious URLs or real phishing infrastructure.
+
+Use synthetic/generic examples, reserved domains, `.test`, `.invalid`, and RFC example IP ranges only for starter data.
+
+## Rebuild datasets
+
+```bash
+python tools/build_datasets.py
+```
+
+The builder cleans labels, normalizes whitespace, removes empty rows, deduplicates, balances classes by downsampling to the smaller class, writes metadata-rich master datasets, and exports training-compatible final CSVs.
+
+## Retrain models
+
+```bash
+python -m train.train_text_model
+python -m train.train_url_model
+```
