@@ -1,0 +1,37 @@
+text,label,source,category,notes
+Account notice: your profile settings were updated successfully in the official app.,legitimate,synthetic,account_notice,Benign account notification.
+Attachment notice: the instructor uploaded the weekly lab instructions to the course portal.,legitimate,synthetic,fake_attachment,Benign attachment-style notification.
+Campus library notice: your borrowed book is due next week.,legitimate,legacy_starter,legacy_starter,
+Cloud storage notice: your shared class folder was updated by the project team.,legitimate,synthetic,cloud_storage,Safe generic collaboration notice.
+HR reminder: submit your timesheet through the internal employee portal.,legitimate,legacy_starter,legacy_starter,
+IT maintenance notice: email service may be unavailable for 15 minutes tonight.,legitimate,legacy_starter,legacy_starter,
+"OTP reminder: never share your one-time passcode with anyone, including support staff.",legitimate,synthetic,otp_theft,Security education example.
+Please review the attached meeting agenda before Friday's project check-in.,legitimate,legacy_starter,legacy_starter,
+Professor Rao shared updated lecture notes on the course portal.,legitimate,legacy_starter,legacy_starter,
+Refund update: your approved campus fee refund will appear in the official portal.,legitimate,synthetic,fake_refund,Legitimate-style refund notice without links.
+Reminder: the coding club workshop registration closes tomorrow.,legitimate,legacy_starter,legacy_starter,
+Student portal reminder: course registration closes Friday at 5 PM.,legitimate,synthetic,student_portal,Generic campus notice; no real student data.
+Team reminder: submit project slides through the official classroom portal before noon.,legitimate,synthetic,student_portal,Generic classroom workflow.
+Team reminder: the security awareness session starts at 3 PM in room 204.,legitimate,legacy_starter,legacy_starter,
+Workplace notice: the office network maintenance window starts at 9 PM.,legitimate,synthetic,workplace_notice,Generic internal maintenance example.
+Your electricity bill has been generated and can be viewed on the official provider site.,legitimate,legacy_starter,legacy_starter,
+Your monthly bank statement is ready in the official mobile app.,legitimate,legacy_starter,legacy_starter,
+Your package delivery window is tomorrow between 10 AM and 12 PM.,legitimate,legacy_starter,legacy_starter,
+Account validation required within one hour or access will be removed.,phishing,legacy_starter,legacy_starter,
+Cloud drive locked: verify your password through the unknown file-sharing link.,phishing,synthetic,cloud_storage,Synthetic cloud storage phishing lure.
+"Congratulations, you won a prize; pay a small processing fee to claim it now.",phishing,legacy_starter,legacy_starter,
+Credential verification required: reply with your username and password to keep access.,phishing,synthetic,credential_theft,Synthetic credential theft wording.
+"Final warning: your payment failed, update card details through this unfamiliar website.",phishing,legacy_starter,legacy_starter,
+Important notice: download the attached form and provide your confidential recovery codes.,phishing,legacy_starter,legacy_starter,
+Mailbox storage full: click the unknown link and re-enter your credentials.,phishing,legacy_starter,legacy_starter,
+One-time passcode check: send us your OTP immediately to stop account closure.,phishing,synthetic,otp_theft,Synthetic OTP theft lure.
+Open the attached payment document and enable macros to view your invoice.,phishing,synthetic,fake_attachment,Synthetic unsafe attachment lure.
+Refund approved: provide card details and banking PIN through the attached form.,phishing,synthetic,fake_refund,Synthetic refund scam wording.
+"Security alert: unusual activity detected, enter your username and password on this external page.",phishing,legacy_starter,legacy_starter,
+Student portal locked: confirm your login details now or lose semester access.,phishing,synthetic,student_portal,Synthetic student portal lure.
+Urgent action required: confirm your login details to avoid permanent suspension.,phishing,legacy_starter,legacy_starter,
+Urgent refund approved: provide banking details through this shortened link.,phishing,legacy_starter,legacy_starter,
+Workplace security alert: approve a login by sharing your recovery code in chat.,phishing,synthetic,workplace_notice,Synthetic workplace social-engineering lure.
+Your account will be closed today unless you verify your password immediately at a suspicious link.,phishing,legacy_starter,legacy_starter,
+Your cloud account is locked; verify identity by sharing your one-time passcode.,phishing,legacy_starter,legacy_starter,
+Your mailbox will be disabled today unless you enter your password on this external page.,phishing,synthetic,credential_theft,Synthetic urgent credential lure.

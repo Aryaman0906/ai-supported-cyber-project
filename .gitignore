@@ -1,0 +1,40 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Environment variables and secrets
+.env
+*.env
+
+# Local editor and OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Generated model artifacts and large local datasets can be added intentionally later
+# Keep placeholder .gitkeep files tracked for now.
+
+credentials.json
+token.json
+reports/generated/
+
+# Runtime lock files
+runtime/
+
+reports/private/
+logs/
+task-log.txt
+.local/
+models/*.joblib
+runtime/*.lock
+
+# Private/raw inbox exports must never be committed
+data/raw/private/
+*.mbox
+*.eml
