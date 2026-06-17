@@ -111,7 +111,7 @@ reports/generated/YYYY-MM-DD/gmail_poll_report.xlsx
 
 ### 8. Generate and upload today's report to Google Drive
 
-Use either a Google Drive folder URL or the raw folder ID. The local worker parses URLs of the form `https://drive.google.com/drive/folders/<FOLDER_ID>?usp=drive_link`.
+Use either a Google Drive folder URL or the raw folder ID. The local worker parses URLs of the form `YOUR-DRIVE-FOLDER`.
 
 ```powershell
 python -m api.gmail_poll_worker --report-today --upload-drive --drive-folder "https://drive.google.com/drive/folders/1Ko8e6ldd3TasM-JQXpJO0wyYJ8S4u8EM?usp=drive_link"
