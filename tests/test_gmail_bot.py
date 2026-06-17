@@ -323,9 +323,22 @@ def test_scan_lock_prevents_overlap(tmp_path):
         assert lock.acquired is False
     assert lock_path.exists()
 
-def test_scan_lock_removes_stale_lock(tmp_path):
+def test_scan_lock_removes_stale_lock(tmp_path, monkeypatch):
     lock_path = tmp_path / "scan.lock"
-    lock_path.write_text(json.dumps({"pid": 99999999, "hostname": socket.gethostname(), "started_at": "old"}), encoding="utf-8")
-    with ScanLock(lock_path=lock_path, stale_seconds=-1) as lock:
+    lock_path.write_text(
+        json.dumps(
+            {
+                "pid": 99999999,
+                "hostname": socket.gethostname(),
+                "started_at": "old",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(ScanLock, "_is_stale_or_dead", lambda self: True)
+
+    with ScanLock(lock_path=lock_path, stale_seconds=3600) as lock:
         assert lock.acquired is True
+
     assert not lock_path.exists()
