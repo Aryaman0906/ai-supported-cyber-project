@@ -160,9 +160,9 @@ class ScanLock:
         if self._is_timed_out():
             return True
 
-        pid = metadata.get("pid")
-        hostname = metadata.get("hostname")
-        if not isinstance(pid, int) or hostname != socket.gethostname():
+        if os.name == "nt":
+            # On Windows, os.kill(pid, 0) is not a safe Unix-style process-exists check.
+            # Use timeout-based stale-lock cleanup as the cross-platform fallback.
             return False
 
         try:
