@@ -380,7 +380,7 @@ def gmail_pubsub_push(envelope: dict[str, Any], token: str | None = None) -> dic
     return {"status": "accepted", "payload": payload, "processing": result}
 
 
-@app.post("/reports/generate-daily")
+@app.post("/reports/generate-daily", dependencies=[Depends(require_local_admin)])
 def reports_generate_daily(request: DailyReportRequest) -> dict[str, Any]:
     """Generate a daily Gmail security report and save locally or to Drive."""
     try:
@@ -389,14 +389,14 @@ def reports_generate_daily(request: DailyReportRequest) -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=f"Report generation failed: {error}") from error
 
 
-@app.get("/reports/today")
+@app.get("/reports/today", dependencies=[Depends(require_local_admin)])
 def reports_today() -> dict[str, Any]:
     from datetime import date
     report = gmail_storage.get_daily_report(date.today().isoformat())
     return report or {"status": "not_found", "date": date.today().isoformat()}
 
 
-@app.get("/reports/{report_date}")
+@app.get("/reports/{report_date}", dependencies=[Depends(require_local_admin)])
 def reports_by_date(report_date: str) -> dict[str, Any]:
     report = gmail_storage.get_daily_report(report_date)
     return report or {"status": "not_found", "date": report_date}
