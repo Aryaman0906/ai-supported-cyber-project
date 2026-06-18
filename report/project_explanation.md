@@ -268,7 +268,7 @@ Windows Task Scheduler runs the local Gmail polling worker periodically. This gi
 
 - The project is defensive-only.
 - Gmail access requires explicit user OAuth authorization.
-- OAuth files such as `credentials.json` and `token.json` are local-only and ignored by Git.
+- `credentials.json` is local-only and ignored by Git. Local OAuth tokens prefer OS credential storage through `keyring`; plaintext `token.json` is only a legacy fallback or migration source and is ignored by Git.
 - Generated reports, logs, runtime files, local storage, and model artifacts should not be committed.
 - HTML emails are parsed as text; scripts and styles must not be executed.
 - Suspicious links are analyzed as indicators and should not be opened in a browser.
@@ -293,7 +293,6 @@ This is a student/demo cybersecurity system, not a production email security gat
 Possible future improvements include:
 
 - More representative sanitized datasets and stronger evaluation metrics.
-- Safer token storage using operating-system secret stores.
 - Report encryption or protected archives for sensitive summaries.
 - Better dashboards and review workflows for labeled Gmail messages.
 - Optional Cloud Run/Pub/Sub processing for users who specifically want a cloud deployment, clearly separate from the current submitted architecture.

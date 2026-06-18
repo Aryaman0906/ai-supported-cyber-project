@@ -140,12 +140,36 @@ http://127.0.0.1:8080
 
 ## Local Gmail polling setup
 
-Place these OAuth files in the project root. They are intentionally ignored by Git:
+Place the Google OAuth client file in the project root. It is intentionally ignored by Git:
 
 ```text
 credentials.json
-token.json
 ```
+
+Local OAuth token storage is secure-by-default:
+
+- `LOCAL_TOKEN_STORAGE=auto` is the default. It prefers OS credential storage through Python `keyring`; if no usable keyring is available, it falls back to legacy plaintext `token.json` with a clear warning and best-effort file permission hardening.
+- `LOCAL_TOKEN_STORAGE=keyring` requires OS credential storage and will not write plaintext `token.json`:
+
+```powershell
+setx LOCAL_TOKEN_STORAGE keyring
+```
+
+- `LOCAL_TOKEN_STORAGE=file` preserves the legacy plaintext `token.json` fallback only for demo troubleshooting:
+
+```powershell
+setx LOCAL_TOKEN_STORAGE file
+```
+
+Plaintext `token.json` is sensitive because it can grant Gmail and Drive access if copied. Existing legacy token files can be hardened on Windows with:
+
+```powershell
+icacls .\token.json /inheritance:r
+icacls .\token.json /grant:r "$env:USERNAME:F"
+icacls .\token.json /remove "Users" "Authenticated Users" "Everyone"
+```
+
+To revoke a local Gmail/Drive authorization, open Google Account → Security → Third-party access, remove this app, delete local token storage or `token.json`, and re-authorize only if needed.
 
 Run one local Gmail scan:
 

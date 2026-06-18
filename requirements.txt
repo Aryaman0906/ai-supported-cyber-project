@@ -28,3 +28,6 @@ google-auth-httplib2==0.2.0
 google-cloud-firestore==2.19.0
 google-cloud-secret-manager==2.20.2
 cryptography==43.0.1
+
+# Local OAuth token storage hardening
+keyring==25.3.0

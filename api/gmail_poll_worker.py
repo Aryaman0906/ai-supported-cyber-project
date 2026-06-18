@@ -5,9 +5,7 @@ Run examples:
     python -m api.gmail_poll_worker --loop --interval 300 --limit 10
     python -m api.gmail_poll_worker --report-today
 
-This worker uses local OAuth files in the project root:
-    credentials.json  Google OAuth desktop/web client downloaded from Cloud Console
-    token.json        Local OAuth token cache created after first browser login
+This worker uses credentials.json from the project root and stores local OAuth tokens through api.local_token_store.
 
 It does not require Pub/Sub, Cloud Run, Firestore, Secret Manager, or Cloud
 Scheduler. It only uses Gmail API and optionally Drive API through the existing
@@ -28,6 +26,7 @@ import time
 from typing import Any
 
 from api.gmail_auth import GMAIL_SCOPES
+from api.local_token_store import LocalOAuthTokenStore, LocalTokenStoreError
 from api.gmail_client import (
     REQUIRED_LABELS,
     apply_labels,
@@ -68,9 +67,13 @@ def load_local_credentials(credentials_path: Path = CREDENTIALS_PATH, token_path
             "Google OAuth libraries are not installed. Run `pip install -r requirements.txt` before using local Gmail polling."
         ) from error
 
-    credentials = None
-    if token_path.exists():
-        credentials = Credentials.from_authorized_user_file(str(token_path), GMAIL_SCOPES)
+    token_store = LocalOAuthTokenStore(token_path)
+    try:
+        token_data = token_store.load()
+    except LocalTokenStoreError as error:
+        raise LocalGmailSetupError(str(error)) from error
+
+    credentials = Credentials.from_authorized_user_info(token_data, GMAIL_SCOPES) if token_data else None
 
     if not credentials or not credentials.valid:
         if credentials and credentials.expired and credentials.refresh_token:
@@ -78,16 +81,19 @@ def load_local_credentials(credentials_path: Path = CREDENTIALS_PATH, token_path
         else:
             flow = InstalledAppFlow.from_client_secrets_file(str(credentials_path), GMAIL_SCOPES)
             credentials = flow.run_local_server(port=0)
-        token_path.write_text(credentials.to_json(), encoding="utf-8")
+        try:
+            token_store.save(json.loads(credentials.to_json()))
+        except LocalTokenStoreError as error:
+            raise LocalGmailSetupError(str(error)) from error
 
     return credentials
 
 
 def build_local_gmail_service(credentials_path: Path = CREDENTIALS_PATH, token_path: Path = TOKEN_PATH):
-    """Build a Gmail API service using local OAuth files.
+    """Build a Gmail API service using local OAuth credentials.
 
-    The first run opens a browser for user consent and writes token.json. Later
-    runs reuse token.json and refresh it when possible.
+    The first run opens a browser for user consent. Later runs reuse the token
+    from OS credential storage by default, or token.json in explicit file mode.
     """
     try:
         from googleapiclient.discovery import build
@@ -385,7 +391,7 @@ def parse_drive_folder_id(folder: str) -> str:
     """Extract a Drive folder ID from a folder URL or return a raw folder ID.
 
     Supported URL example:
-    https://drive.google.com/drive/folders/<FOLDER_ID>?usp=drive_link
+    Google Drive folder sharing URL containing /folders/<FOLDER_ID>
     """
     folder = folder.strip()
     if not folder:

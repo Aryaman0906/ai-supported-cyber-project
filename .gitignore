@@ -33,3 +33,8 @@ task-log.txt
 .local/
 models/*.joblib
 runtime/*.lock
+
+.env.local
+.local/token*.bak
+.local/*token*
+*.joblib
