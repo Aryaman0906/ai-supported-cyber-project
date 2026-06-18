@@ -25,6 +25,9 @@ PROTECTED_ROUTES = {
     "/polling/report-today",
     "/polling/latest-log",
     "/polling/reports",
+    "/reports/generate-daily",
+    "/reports/today",
+    "/reports/{report_date}",
 }
 
 
@@ -84,7 +87,7 @@ def test_polling_read_only_endpoints_accept_correct_admin_header(monkeypatch):
 
 
 @pytest.mark.skipif(not HAS_FASTAPI, reason="FastAPI dependency is unavailable")
-def test_polling_routes_use_local_admin_dependency():
+def test_protected_routes_use_local_admin_dependency():
     protected_routes = {
         route.path: route
         for route in app.routes
