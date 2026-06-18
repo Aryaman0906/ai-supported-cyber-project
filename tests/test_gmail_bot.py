@@ -199,8 +199,8 @@ def test_local_report_console_format():
 
 
 def test_drive_folder_url_and_raw_id_parsing():
-    folder_id = "1Ko8e6ldd3TasM-JQXpJO0wyYJ8S4u8EM"
-    url = f"https://drive.google.com/drive/folders/{folder_id}?usp=drive_link"
+    folder_id = "TEST_DRIVE_FOLDER_ID"
+    url = f"https://drive.example.test/drive/folders/{folder_id}?usp=drive_link"
     assert parse_drive_folder_id(url) == folder_id
     assert parse_drive_folder_id(folder_id) == folder_id
 
@@ -243,7 +243,7 @@ def test_drive_upload_behavior_mocked(tmp_path, monkeypatch):
         "markdown_path": str(markdown),
         "csv_path": str(csv_path),
         "xlsx_path": str(xlsx_path),
-    }, "https://drive.google.com/drive/folders/folder123?usp=drive_link")
+    }, "https://drive.example.test/drive/folders/folder123?usp=drive_link")
 
     assert result["markdown"]["webViewLink"].endswith("gmail_poll_report.md")
     assert result["csv"]["webViewLink"].endswith("gmail_poll_report.csv")
@@ -256,16 +256,16 @@ def test_report_console_format_includes_drive_urls():
         "csv_path": "reports/generated/2026-06-16/gmail_poll_report.csv",
         "xlsx_path": "reports/generated/2026-06-16/gmail_poll_report.xlsx",
         "drive": {
-            "markdown": {"webViewLink": "https://drive.google.com/file/d/md"},
-            "csv": {"webViewLink": "https://drive.google.com/file/d/csv"},
-            "xlsx": {"webViewLink": "https://drive.google.com/file/d/xlsx"},
+            "markdown": {"webViewLink": "https://drive.example.test/file/d/md"},
+            "csv": {"webViewLink": "https://drive.example.test/file/d/csv"},
+            "xlsx": {"webViewLink": "https://drive.example.test/file/d/xlsx"},
         },
     })
     assert "GMAIL POLLING REPORT GENERATED" in output
     assert "DRIVE UPLOAD COMPLETE" in output
-    assert "Markdown URL: https://drive.google.com/file/d/md" in output
-    assert "CSV URL     : https://drive.google.com/file/d/csv" in output
-    assert "XLSX URL    : https://drive.google.com/file/d/xlsx" in output
+    assert "Markdown URL: https://drive.example.test/file/d/md" in output
+    assert "CSV URL     : https://drive.example.test/file/d/csv" in output
+    assert "XLSX URL    : https://drive.example.test/file/d/xlsx" in output
 
 from api import polling_dashboard
 
