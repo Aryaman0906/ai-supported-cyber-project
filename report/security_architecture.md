@@ -36,7 +36,7 @@ The local scheduler periodically starts the Gmail polling worker. The worker sca
 |---|---|
 | Scheduled polling instead of Pub/Sub | Avoids paid cloud dependencies |
 | Gmail labels instead of deletion | Prevents destructive false positives |
-| Local token files ignored by Git | Prevents OAuth token leakage |
+| Local OAuth token storage prefers OS credential storage | Reduces plaintext token exposure |
 | Reports generated with metadata only | Reduces privacy exposure |
 | Drive upload optional | Keeps cloud dependency limited |
 
@@ -125,7 +125,7 @@ Privacy controls include:
 
 ## Secret and token handling
 
-OAuth files such as `credentials.json` and `token.json` are local-only and ignored by Git. Environment files and local runtime files should also stay out of version control.
+Local OAuth token storage now prefers OS credential storage through `keyring`. Plaintext `token.json` remains only as an explicit legacy fallback or as a migration source for older local setups. Environment files and local runtime files should also stay out of version control.
 
 Generated reports, logs, runtime files, local storage, model artifacts, credentials, tokens, and API keys must not be committed. This includes `.env`, `.local`, `reports/generated`, runtime directories, token files, and local model files.
 
@@ -140,7 +140,7 @@ Important threats include:
 - Privacy leakage when optional third-party URL checks are enabled.
 - Over-trusting demo model output without human review.
 
-The project mitigates these risks with local-only secrets, Git ignore rules, non-destructive Gmail labels, safe parsing expectations, optional external checks, and explicit human review requirements.
+The project mitigates these risks with OS credential storage for local OAuth tokens where available, Git ignore rules, non-destructive Gmail labels, safe parsing expectations, optional external checks, and explicit human review requirements. Plaintext token files are limited to explicit fallback/demo mode or one-time migration sources.
 
 ## Security limitations
 
@@ -153,13 +153,13 @@ This is a student/demo system, not a production email security gateway. Limitati
 - No guaranteed protection against novel phishing campaigns.
 - No automatic deletion, forwarding, replying, blocking, or enterprise quarantine.
 - Local machine security directly affects token and report security.
+- For real deployments, use managed secrets or encrypted token storage rather than local plaintext token files.
 
 ## Future security improvements
 
 Future optional work could include:
 
 - A carefully scoped Cloud Run/Pub/Sub architecture for users who want cloud-hosted push processing.
-- Stronger token storage using OS secret stores.
 - More granular Gmail and Drive scopes where possible.
 - Report encryption or password-protected archives.
 - Better model evaluation with larger sanitized datasets.
