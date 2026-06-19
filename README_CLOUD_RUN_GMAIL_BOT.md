@@ -1,23 +1,48 @@
 # Cloud Run Gmail Security Bot Setup
 
-This repository is now cloud-ready, but code alone does **not** deploy Gmail real-time monitoring. You must configure Google Cloud, OAuth consent, Gmail API, Pub/Sub, Cloud Run, Firestore, Secret Manager or environment secrets, Cloud Scheduler, and Drive API.
+This file is **future optional deployment guidance**. It is not the current submitted architecture.
 
-## Architecture
+The current working project architecture is local scheduled automation:
+
+```text
+Windows Task Scheduler
+→ local Gmail polling script
+→ Gmail API scan
+→ AI-Cyber labels
+→ local Markdown/CSV/XLSX reports
+→ optional Google Drive report upload
+```
+
+Use the Cloud Run/Pub/Sub design only after authentication, IAM, OAuth consent, protected runtime configuration, and report privacy are hardened.
+
+## Cloud deployment safety rule
+
+Do **not** expose Gmail, OAuth, Pub/Sub, report, scan, log, or maintenance endpoints as public anonymous endpoints.
+
+For any real cloud deployment:
+
+- require Cloud Run IAM authentication, IAP, API Gateway, or another access-control layer;
+- grant invoker access only to approved users or service accounts;
+- use authenticated Pub/Sub push with OIDC/IAM;
+- store protected application configuration in Secret Manager;
+- keep email preview storage disabled unless there is explicit consent and a privacy reason;
+- use a dedicated Cloud Run service account with minimum required permissions.
+
+## Optional cloud architecture
 
 ```text
 Gmail inbox change
 → Gmail API users.watch
 → Cloud Pub/Sub topic
-→ Pub/Sub push subscription
-→ Cloud Run FastAPI /gmail/pubsub/push?token=...
-→ decode Pub/Sub message
+→ authenticated Pub/Sub push subscription
+→ Cloud Run FastAPI webhook
 → Gmail history.list from stored historyId
 → fetch new INBOX messages
 → analyze subject/snippet/body/URLs
 → apply AI-Cyber labels by risk level
 → store scan metadata
 → daily Markdown/CSV report
-→ Google Drive folder "AI Cyber Reports" or local reports/generated/
+→ Google Drive folder or local reports/generated/
 ```
 
 ## Required Google Cloud APIs
@@ -32,25 +57,7 @@ Enable these APIs in the project:
 - Drive API
 - Cloud Scheduler API
 
-## Required environment variables
-
-- `ENVIRONMENT`
-- `GOOGLE_CLOUD_PROJECT`
-- `CLOUD_RUN_BASE_URL`
-- `GMAIL_OAUTH_REDIRECT_URI`
-- `GMAIL_PUBSUB_TOPIC`
-- `GOOGLE_OAUTH_CLIENT_SECRET_JSON` or `GOOGLE_OAUTH_CLIENT_SECRET_NAME`
-- `TOKEN_ENCRYPTION_KEY`
-- `PUBSUB_PUSH_TOKEN`
-- `TASK_SHARED_SECRET`
-- `STORE_EMAIL_PREVIEWS`
-- `STORAGE_BACKEND`
-- `LOCAL_STORAGE_PATH`
-- `DRIVE_REPORT_FOLDER_NAME`
-- `REPORT_OUTPUT_DIR`
-- `GMAIL_BOT_USER_EMAIL`
-
-Never commit real credentials, tokens, OAuth client secrets, or personal Gmail data.
+Never commit real credentials, runtime config, Drive links, generated reports, logs, or personal Gmail data.
 
 ## Local development commands
 
@@ -66,14 +73,14 @@ python tests/cloud_gmail_bot_check.py
 pytest
 ```
 
-Open:
+Open locally only:
 
 ```text
 http://127.0.0.1:8000/docs
 frontend/index.html
 ```
 
-## Cloud Run deployment
+## Cloud Run deployment: authenticated only
 
 Cloud Run requires the app to listen on `0.0.0.0` and the injected `$PORT`; the Dockerfile uses:
 
@@ -81,41 +88,33 @@ Cloud Run requires the app to listen on `0.0.0.0` and the injected `$PORT`; the 
 uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8080}
 ```
 
-Deploy from source:
+Deploy from source without granting anonymous/public invoker access:
 
 ```bash
 gcloud run deploy gmail-security-bot \
   --source . \
   --region us-central1 \
-  --allow-unauthenticated \
   --set-env-vars ENVIRONMENT=production,GOOGLE_CLOUD_PROJECT=YOUR_PROJECT,STORAGE_BACKEND=firestore,STORE_EMAIL_PREVIEWS=false
 ```
 
-For real deployments, prefer Secret Manager instead of large secret values in `--set-env-vars`.
+Then grant invoker access only to a specific approved principal:
+
+```bash
+gcloud run services add-iam-policy-binding gmail-security-bot \
+  --region us-central1 \
+  --member="user:YOUR_EMAIL@example.com" \
+  --role="roles/run.invoker"
+```
+
+For real deployments, prefer Secret Manager instead of large values in environment variables.
 
 ## OAuth consent setup
 
 1. Create an OAuth consent screen in Google Cloud.
 2. Add yourself as a test user for personal/testing use.
 3. Create a Web application OAuth client.
-4. Add redirect URI:
-   `https://YOUR_CLOUD_RUN_URL/gmail/auth/callback`.
-5. Store the OAuth client JSON in Secret Manager or set `GOOGLE_OAUTH_CLIENT_SECRET_JSON`.
-6. Generate a Fernet key for `TOKEN_ENCRYPTION_KEY`:
-
-```bash
-python - <<'PY'
-from cryptography.fernet import Fernet
-print(Fernet.generate_key().decode())
-PY
-```
-
-The app uses only these scopes:
-
-- `https://www.googleapis.com/auth/gmail.modify`
-- `https://www.googleapis.com/auth/drive.file`
-
-It does **not** use the full `https://mail.google.com/` scope.
+4. Add redirect URI: `https://YOUR_CLOUD_RUN_URL/gmail/auth/callback`.
+5. Store OAuth client configuration in Secret Manager or another protected runtime configuration system.
 
 ## Pub/Sub setup
 
@@ -133,15 +132,16 @@ gcloud pubsub topics add-iam-policy-binding gmail-security-bot \
   --role=roles/pubsub.publisher
 ```
 
-Create a push subscription to Cloud Run:
+Create a push subscription only after Cloud Run invoker access and Pub/Sub OIDC authentication are configured:
 
 ```bash
 gcloud pubsub subscriptions create gmail-security-bot-push \
   --topic=gmail-security-bot \
-  --push-endpoint="https://YOUR_CLOUD_RUN_URL/gmail/pubsub/push?token=YOUR_PUBSUB_PUSH_TOKEN"
+  --push-endpoint="https://YOUR_CLOUD_RUN_URL/gmail/pubsub/push" \
+  --push-auth-service-account=YOUR_PUBSUB_PUSH_SERVICE_ACCOUNT@YOUR_PROJECT.iam.gserviceaccount.com
 ```
 
-For production, use authenticated Pub/Sub push with IAM/OIDC rather than only a shared token.
+Do not rely on a query-string value as the only protection for a deployed webhook.
 
 ## Gmail watch setup and renewal
 
@@ -154,24 +154,26 @@ The watch monitors `INBOX` only and the scanner avoids reprocessing messages alr
 
 ## Cloud Scheduler daily maintenance
 
-Create a scheduler job to call `/tasks/daily-maintenance` with header `X-Task-Secret: YOUR_TASK_SHARED_SECRET`.
+Create a scheduler job to call `/tasks/daily-maintenance` with an internal authentication mechanism.
 
-The endpoint renews the Gmail watch, scans recent inbox messages as fallback, and generates a local daily report. It refuses to run if `TASK_SHARED_SECRET` is not configured.
+The endpoint renews the Gmail watch, scans recent inbox messages as fallback, and generates a local daily report. In production, protect scheduler calls with IAM/OIDC and an application-level guard.
 
 ## Drive reports setup
 
-The OAuth flow includes `drive.file`. `/reports/generate-daily` can upload Markdown and CSV files to a Drive folder named `AI Cyber Reports` when `upload_to_drive=true` and the user has completed OAuth. If Drive upload is not requested, reports are saved locally under `reports/generated/YYYY-MM-DD/`.
+`/reports/generate-daily` can upload Markdown and CSV files to a Drive folder named `AI Cyber Reports` when Drive upload is requested and the user has completed OAuth. If Drive upload is not requested, reports are saved locally under `reports/generated/YYYY-MM-DD/`.
+
+For real deployments, verify Drive folder permissions before enabling upload. Do not upload reports containing private subjects, snippets, full message IDs, personal addresses, or sensitive URLs unless you have consent and a retention policy.
 
 ## Troubleshooting
 
-- **401 from webhook:** Check `PUBSUB_PUSH_TOKEN` and the push URL query string.
+- **401 from webhook:** Check Cloud Run IAM and Pub/Sub OIDC service account permissions.
 - **403 Gmail API:** Check OAuth consent, test users, scopes, and that Gmail API is enabled.
-- **invalid_grant OAuth issue:** Restart OAuth; refresh tokens may have expired or been revoked.
+- **403 Cloud Run invocation:** Check that the caller has `roles/run.invoker` on the service.
 - **watch expired:** Call `/gmail/watch/renew`; schedule daily renewal.
-- **Pub/Sub not delivering:** Verify topic, subscription, Cloud Run URL, and Gmail publisher IAM binding.
+- **Pub/Sub not delivering:** Verify topic, subscription, push service account, Cloud Run URL, and Gmail publisher IAM binding.
 - **model missing:** Run `python -m train.train_text_model` and `python -m train.train_url_model`; ensure model files are present in the deployed image or generated before deploy.
 - **Firestore permission issue:** Grant the Cloud Run service account Firestore permissions.
-- **Drive upload permission issue:** Ensure OAuth completed with `drive.file` scope.
+- **Drive upload permission issue:** Ensure Drive folder access is correct.
 
 ## Security notes
 
@@ -181,6 +183,8 @@ The OAuth flow includes `drive.file`. `/reports/generate-daily` can upload Markd
 - Do not store full email bodies by default.
 - Do not open links, download attachments, send replies, delete mail, crawl URLs, or detonate files.
 - Do not use this as a final security decision system; human review is required.
+- Do not publish scan, report, log, OAuth, Gmail watch, or maintenance endpoints without authentication.
+- Treat Cloud Run/Pub/Sub as future optional scope for the current project unless you can prove a secure authenticated deployment.
 
 ## Official documentation used
 
