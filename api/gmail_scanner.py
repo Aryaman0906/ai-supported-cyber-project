@@ -5,7 +5,7 @@ import base64, hashlib, json, os
 from datetime import datetime, timezone
 from typing import Any
 
-from api.gmail_client import build_gmail_service, ensure_labels, labels_for_risk, apply_labels, parse_gmail_message, REQUIRED_LABELS
+from api.gmail_client import build_gmail_service, ensure_labels, label_names_for_risk, labels_for_risk, apply_labels, parse_gmail_message
 from api.risk_engine import GmailRiskEngine
 from api.storage import BotStorage, utc_now_iso
 
@@ -54,10 +54,9 @@ class GmailScanner:
             return {"message_id": message_id, "skipped": True, "reason": "Already labeled AI-Cyber/Scanned"}
         combined_text = "\n".join([parsed.subject, parsed.snippet, parsed.body_text])[:10_000]
         risk = self.risk_engine.analyze(combined_text, parsed.urls)
-        risk_level = risk.risk_level if risk.risk_level != "unknown" else "medium"
-        label_ids = labels_for_risk(risk_level, labels)
+        label_ids = labels_for_risk(risk.risk_level, labels)
         apply_labels(service, message_id, label_ids)
-        record = scan_result_record(email, parsed, risk, [REQUIRED_LABELS["scanned"], REQUIRED_LABELS["medium" if risk.risk_level == "unknown" else risk_level]])
+        record = scan_result_record(email, parsed, risk, label_names_for_risk(risk.risk_level))
         if risk.risk_level == "unknown":
             record["reasons"] = [*record["reasons"], "Unknown analysis result; review manually."]
         self.storage.save_scan_result(email, message_id, record)
