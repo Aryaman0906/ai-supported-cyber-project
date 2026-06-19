@@ -15,6 +15,9 @@ REQUIRED_LABELS = {
     "low": "AI-Cyber/Low",
     "medium": "AI-Cyber/Medium",
     "high": "AI-Cyber/High",
+    "needs_review": "AI-Cyber/Needs Review",
+    "false_positive": "AI-Cyber/False Positive",
+    "confirmed_phishing": "AI-Cyber/Confirmed Phishing",
 }
 URL_RE = re.compile(r"https?://[^\s<>\"')]+", re.IGNORECASE)
 
@@ -173,9 +176,25 @@ def ensure_labels(service) -> dict[str, str]:
     return {key: name_to_id[name] for key, name in REQUIRED_LABELS.items()}
 
 
+def risk_label_key(risk_level: str) -> str:
+    normalized = (risk_level or "").lower()
+    if normalized == "high":
+        return "high"
+    if normalized == "medium":
+        return "medium"
+    if normalized == "low":
+        return "low"
+    return "needs_review"
+
+
 def labels_for_risk(risk_level: str, label_ids: dict[str, str]) -> list[str]:
-    mapped = "medium" if risk_level in {"unknown", "medium"} else "high" if risk_level == "high" else "low"
-    return [label_ids["scanned"], label_ids[mapped]]
+    risk_key = risk_label_key(risk_level)
+    return [label_ids["scanned"], label_ids[risk_key]]
+
+
+def label_names_for_risk(risk_level: str) -> list[str]:
+    risk_key = risk_label_key(risk_level)
+    return [REQUIRED_LABELS["scanned"], REQUIRED_LABELS[risk_key]]
 
 
 def apply_labels(service, message_id: str, label_ids: list[str]) -> None:
