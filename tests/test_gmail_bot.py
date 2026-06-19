@@ -6,7 +6,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from api.gmail_client import labels_for_risk, parse_gmail_message
+from api.gmail_client import REQUIRED_LABELS, label_names_for_risk, labels_for_risk, parse_gmail_message
 from api.gmail_scanner import decode_pubsub_push
 from api.report_writer import generate_csv_report, generate_markdown_report, generate_xlsx_report_bytes
 from api.risk_engine import GmailRiskEngine, RiskResult
@@ -91,10 +91,40 @@ def test_nested_multipart_html_parsing():
     assert "https://nested.example.test/path" in parsed.urls
     assert parsed.has_attachments is True
 
-def test_label_selection_unknown_maps_to_medium():
-    labels = {"scanned":"S","low":"L","medium":"M","high":"H"}
-    assert labels_for_risk("unknown", labels) == ["S", "M"]
+
+def review_label_ids():
+    return {
+        "scanned": "S",
+        "low": "L",
+        "medium": "M",
+        "high": "H",
+        "needs_review": "R",
+        "false_positive": "FP",
+        "confirmed_phishing": "CP",
+    }
+
+
+def test_label_selection_unknown_maps_to_needs_review():
+    labels = review_label_ids()
+    assert labels_for_risk("unknown", labels) == ["S", "R"]
+    assert labels_for_risk("unexpected", labels) == ["S", "R"]
+    assert label_names_for_risk("unknown") == ["AI-Cyber/Scanned", "AI-Cyber/Needs Review"]
     assert labels_for_risk("high", labels) == ["S", "H"]
+    assert labels_for_risk("medium", labels) == ["S", "M"]
+    assert labels_for_risk("low", labels) == ["S", "L"]
+
+
+def test_manual_feedback_labels_are_created_but_not_auto_applied():
+    labels = review_label_ids()
+    assert REQUIRED_LABELS["needs_review"] == "AI-Cyber/Needs Review"
+    assert REQUIRED_LABELS["false_positive"] == "AI-Cyber/False Positive"
+    assert REQUIRED_LABELS["confirmed_phishing"] == "AI-Cyber/Confirmed Phishing"
+    assert "FP" not in labels_for_risk("high", labels)
+    assert "CP" not in labels_for_risk("high", labels)
+    unknown_labels = labels_for_risk("unknown", labels)
+    assert unknown_labels == ["S", "R"]
+    assert "M" not in unknown_labels
+
 
 def test_report_generation():
     results = [{"message_id":"m1","date":"2026-06-13","sender_domain":"bad.test","risk_level":"high","score":0.9,"url_domains":["bad.test"],"reasons":["reason"]}]
@@ -129,7 +159,15 @@ class FakeMessages:
 
 class FakeLabels:
     def __init__(self):
-        self.labels = [{"name":"AI-Cyber/Scanned","id":"S"},{"name":"AI-Cyber/Low","id":"L"},{"name":"AI-Cyber/Medium","id":"M"},{"name":"AI-Cyber/High","id":"H"}]
+        self.labels = [
+            {"name":"AI-Cyber/Scanned","id":"S"},
+            {"name":"AI-Cyber/Low","id":"L"},
+            {"name":"AI-Cyber/Medium","id":"M"},
+            {"name":"AI-Cyber/High","id":"H"},
+            {"name":"AI-Cyber/Needs Review","id":"R"},
+            {"name":"AI-Cyber/False Positive","id":"FP"},
+            {"name":"AI-Cyber/Confirmed Phishing","id":"CP"},
+        ]
     def list(self, **kwargs): return FakeExecute({"labels": self.labels})
     def create(self, **kwargs): return FakeExecute({"id":"NEW"})
 
@@ -146,6 +184,11 @@ class MediumRiskEngine:
     def analyze(self, text, urls):
         return RiskResult("medium", 0.7, "phishing", 0.7, [], ["mock medium"], "safe")
 
+class UnknownRiskEngine:
+    def analyze(self, text, urls):
+        return RiskResult("unknown", 0.0, "unknown", 0.0, [], ["mock unknown"], "unknown")
+
+
 def test_local_polling_dry_run_logic(tmp_path):
     service = FakeGmailService()
     storage = InMemoryStorage()
@@ -153,6 +196,26 @@ def test_local_polling_dry_run_logic(tmp_path):
     assert summary["scanned_count"] == 1
     assert summary["medium_count"] == 1
     assert service.users().messages().modified == []
+
+
+def test_local_polling_unknown_risk_applies_needs_review_label(tmp_path):
+    service = FakeGmailService()
+    storage = InMemoryStorage()
+    summary = scan_latest_inbox(service, storage, UnknownRiskEngine(), limit=5)
+    assert summary["scanned_count"] == 1
+    assert summary["unknown_count"] == 1
+    assert summary["medium_count"] == 0
+    modified = service.users().messages().modified
+    assert len(modified) == 1
+    add_ids = modified[0]["body"]["addLabelIds"]
+    assert add_ids == ["S", "R"]
+    assert "M" not in add_ids
+    stored = next(iter(storage.scan_results.values()))
+    assert stored["risk_level"] == "unknown"
+    assert "AI-Cyber/Needs Review" in stored["labels_applied"]
+    assert "AI-Cyber/Medium" not in stored["labels_applied"]
+    assert any("review manually" in reason for reason in stored["reasons"])
+
 
 def test_local_report_generation(tmp_path, monkeypatch):
     monkeypatch.setattr("api.gmail_poll_worker.REPORT_ROOT", tmp_path)
@@ -196,6 +259,7 @@ def test_local_report_console_format():
     output = format_report_output({"date": "2026-06-15", "markdown_path": "reports/generated/2026-06-15/report.md", "csv_path": "reports/generated/2026-06-15/report.csv", "xlsx_path": "reports/generated/2026-06-15/report.xlsx"})
     assert "GMAIL POLLING REPORT GENERATED" in output
     assert "reports/generated/2026-06-15/report.md" in output
+
 
 
 def test_drive_folder_url_and_raw_id_parsing():
