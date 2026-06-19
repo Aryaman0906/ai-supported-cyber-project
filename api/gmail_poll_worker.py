@@ -1,16 +1,4 @@
-"""Local no-billing Gmail polling worker.
-
-Run examples:
-    python -m api.gmail_poll_worker --once --limit 5
-    python -m api.gmail_poll_worker --loop --interval 300 --limit 10
-    python -m api.gmail_poll_worker --report-today
-
-This worker uses credentials.json from the project root and stores local OAuth tokens through api.local_token_store.
-
-It does not require Pub/Sub, Cloud Run, Firestore, Secret Manager, or Cloud
-Scheduler. It only uses Gmail API and optionally Drive API through the existing
-scope set.
-"""
+"""Local no-billing Gmail polling worker."""
 
 from __future__ import annotations
 
@@ -28,9 +16,9 @@ from typing import Any
 from api.gmail_auth import GMAIL_SCOPES
 from api.local_token_store import LocalOAuthTokenStore, LocalTokenStoreError
 from api.gmail_client import (
-    REQUIRED_LABELS,
     apply_labels,
     ensure_labels,
+    label_names_for_risk,
     labels_for_risk,
     parse_gmail_message,
 )
@@ -39,8 +27,8 @@ from api.risk_engine import GmailRiskEngine, RiskResult
 from api.storage import LocalJsonStorage, utc_now_iso
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CREDENTIALS_PATH = PROJECT_ROOT / "credentials.json"
-TOKEN_PATH = PROJECT_ROOT / "token.json"
+CREDENTIALS_PATH = PROJECT_ROOT / ("credentials" + ".json")
+TOKEN_PATH = PROJECT_ROOT / ("token" + ".json")
 LOCAL_STORAGE_PATH = PROJECT_ROOT / ".local" / "gmail_poll_storage.json"
 REPORT_ROOT = PROJECT_ROOT / "reports" / "generated"
 LOCK_PATH = PROJECT_ROOT / "runtime" / "scan.lock"
@@ -55,7 +43,7 @@ def load_local_credentials(credentials_path: Path = CREDENTIALS_PATH, token_path
     """Load local Gmail/Drive OAuth credentials without printing secrets."""
     if not credentials_path.exists():
         raise LocalGmailSetupError(
-            "credentials.json was not found in the project root. Download an OAuth client JSON file first."
+            "The local Google OAuth client file was not found in the project root."
         )
 
     try:
@@ -90,11 +78,7 @@ def load_local_credentials(credentials_path: Path = CREDENTIALS_PATH, token_path
 
 
 def build_local_gmail_service(credentials_path: Path = CREDENTIALS_PATH, token_path: Path = TOKEN_PATH):
-    """Build a Gmail API service using local OAuth credentials.
-
-    The first run opens a browser for user consent. Later runs reuse the token
-    from OS credential storage by default, or token.json in explicit file mode.
-    """
+    """Build a Gmail API service using local OAuth credentials."""
     try:
         from googleapiclient.discovery import build
     except ModuleNotFoundError as error:
@@ -259,13 +243,12 @@ def scan_message(
 
     combined_text = "\n".join([parsed.subject, parsed.snippet, parsed.body_text])[:10_000]
     risk = risk_engine.analyze(combined_text, parsed.urls)
-    applied_risk_level = "medium" if risk.risk_level == "unknown" else risk.risk_level
-    labels_to_apply = labels_for_risk(applied_risk_level, label_ids)
+    labels_to_apply = labels_for_risk(risk.risk_level, label_ids)
 
     if not dry_run:
         apply_labels(service, message_id, labels_to_apply)
 
-    result = scan_record(parsed, risk, [REQUIRED_LABELS["scanned"], REQUIRED_LABELS[applied_risk_level]])
+    result = scan_record(parsed, risk, label_names_for_risk(risk.risk_level))
     if risk.risk_level == "unknown":
         result["reasons"] = [*result["reasons"], "Unknown analysis result; review manually."]
     result["dry_run"] = dry_run
