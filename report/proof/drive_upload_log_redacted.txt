@@ -1,0 +1,12 @@
+﻿DRIVE_REPORT_FOLDER is configured. Generating report and uploading to Drive. 
+DRIVE UPLOAD COMPLETE
+Scan exit code: 1 
+Report exit code: 0 
+DRIVE_REPORT_FOLDER is configured. Generating report and uploading to Drive. 
+DRIVE UPLOAD COMPLETE
+Scan exit code: 0 
+Report exit code: 0 
+DRIVE_REPORT_FOLDER is configured. Generating report and uploading to Drive. 
+DRIVE UPLOAD COMPLETE
+Scan exit code: 0 
+Report exit code: 0 
