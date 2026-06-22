@@ -8,7 +8,7 @@
 
 This project is a defensive cybersecurity mini-project that combines ML-based phishing analysis, URL analysis, rule-based log triage, and Gmail security automation. The Gmail automation uses near-real-time local scheduled polling through Windows Task Scheduler. It uses the Gmail API and optional Drive API integration, not paid Pub/Sub/Cloud Run monitoring.
 
-The system analyzes email text, extracted URLs, and sanitized log lines. It applies non-destructive Gmail labels for scanned, low, medium, and high risk messages, then generates local Markdown, CSV, and XLSX reports. Reports can optionally be uploaded to Google Drive for backup/storage. FastAPI remains part of the local demo for text, URL, and log analysis with immediate prediction responses.
+The system analyzes email text, extracted URLs, and sanitized log lines. It applies non-destructive Gmail labels for scanned, low, medium, high, and needs-review messages, then generates local Markdown, CSV, and XLSX reports. Reports can optionally be uploaded to Google Drive for backup/storage. FastAPI remains part of the local demo for text, URL, and log analysis with immediate prediction responses.
 
 ## Problem statement
 
@@ -52,7 +52,7 @@ The main objectives are:
 - Near-real-time scheduled Gmail polling through a local Windows scheduler.
 - Gmail API inbox scanning after explicit OAuth authorization.
 - Safe parsing of plain-text and HTML email bodies.
-- AI-Cyber Gmail labels for scanned, low, medium, and high risk messages.
+- AI-Cyber Gmail labels for scanned, low, medium, high, needs-review, and manual feedback states.
 - Local Markdown, CSV, and XLSX report generation.
 - Optional Google Drive report upload through the Drive API.
 - Responsible-use and limitation documentation.
@@ -122,6 +122,38 @@ Windows Task Scheduler
 → optionally upload reports to Google Drive
 ```
 
+### Gmail polling architecture diagram
+
+The following Mermaid diagram shows the actual submitted Gmail automation flow. It represents local scheduled polling, not full Gmail push monitoring and not a fully cloud-native Cloud Run/Pub/Sub deployment.
+
+```mermaid
+flowchart TD
+    A[Windows Task Scheduler] --> B[run_gmail_poll_hidden.vbs]
+    B --> C[run_gmail_poll_once.bat]
+    C --> D[api.gmail_poll_worker]
+
+    D --> E[Gmail OAuth credentials / local token store]
+    D --> F[Gmail API]
+
+    F --> G[Fetch recent INBOX messages]
+    G --> H[parse_gmail_message in api/gmail_client.py]
+    H --> I[GmailRiskEngine]
+    I --> J[Text model + URL model + rules]
+    J --> K[Risk result: low / medium / high / unknown]
+
+    K --> L[Gmail labels]
+    K --> M[LocalJsonStorage]
+
+    M --> R[api.report_writer]
+    R --> N[Markdown report]
+    R --> O[CSV report]
+    R --> P[XLSX report]
+
+    N --> Q[Optional Google Drive upload]
+    O --> Q
+    P --> Q
+```
+
 ### 4. Gmail labeling and reporting layer
 
 The Gmail response is intentionally non-destructive. Instead of deleting, forwarding, replying to, or blocking emails, the worker applies labels:
@@ -131,6 +163,9 @@ AI-Cyber/Scanned
 AI-Cyber/Low
 AI-Cyber/Medium
 AI-Cyber/High
+AI-Cyber/Needs Review
+AI-Cyber/False Positive
+AI-Cyber/Confirmed Phishing
 ```
 
 Reports are generated locally in Markdown, CSV, and XLSX formats. Google Drive upload is optional and is used only for report backup/storage, not as a full cloud security backend.
@@ -166,6 +201,9 @@ AI-Cyber/Scanned
 AI-Cyber/Low
 AI-Cyber/Medium
 AI-Cyber/High
+AI-Cyber/Needs Review
+AI-Cyber/False Positive
+AI-Cyber/Confirmed Phishing
 ```
 
 ## Data used
